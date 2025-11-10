@@ -1,0 +1,54 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pdb
+*.log
+*.sqlite3
+*.db
+
+# --- Virtual envs ---
+.venv/
+env/
+venv/
+ENV/
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+
+# --- System files ---
+.DS_Store
+Thumbs.db
+
+# --- Temporary / cache ---
+*.tmp
+*.bak
+*.old
+tmp/
+temp/
+cache/
+*.orig
+
+# --- Build / dist ---
+build/
+dist/
+*.egg-info/
+.eggs/
+*.spec
+
+# --- Images / assets (optional keep only via .gitattributes) ---
+images/cards/*.jpg
+
+# --- Config / sensitive ---
+config.py
+.env
+*.env
+
+# --- n8n local data ---
+.n8n/
+*.json.backup
+*.n8n.backup
