@@ -41,7 +41,7 @@ dist/
 *.spec
 
 # --- Images / assets (optional keep only via .gitattributes) ---
-images/cards/*.jpg
+# images/cards/*.jpg
 
 # --- Config / sensitive ---
 # config.py
