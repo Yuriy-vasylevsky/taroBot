@@ -147,7 +147,7 @@ async def chat(message: types.Message, state: FSMContext):
     response = await client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=get_history(user_id),
-        max_tokens=400
+        max_tokens=4000
     )
 
     reply = response.choices[0].message.content
@@ -200,7 +200,7 @@ async def chat(message: types.Message, state: FSMContext):
     follow = await client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=get_history(user_id),
-        max_tokens=500
+        max_tokens=5000
     )
 
     final_reply = follow.choices[0].message.content
