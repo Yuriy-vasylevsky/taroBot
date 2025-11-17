@@ -276,11 +276,16 @@
 # Телеграм ТАРО-ЧАТ з GPT 4.1-mini
 # Живий діалоговий таролог: GPT сам просить карти, а бот їх тягне і повертає GPT
 
+# dialog_gpt_tarot.py
+# Телеграм ТАРО-ЧАТ з GPT 4.1-mini
+# Живий діалоговий таролог: GPT пропонує розклади, просить карти, бот їх тягне і повертає на тлумачення
+
 import re
 import random
 import asyncio
 import io
 from typing import List, Dict
+
 from modules.menu import menu
 from aiogram import Router, types, F
 from aiogram.fsm.state import State, StatesGroup
@@ -303,7 +308,7 @@ client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 user_histories: Dict[int, List[Dict[str, str]]] = {}
 
 
-def get_history(user_id: int):
+def get_history(user_id: int) -> List[Dict[str, str]]:
     if user_id not in user_histories:
         user_histories[user_id] = []
     return user_histories[user_id]
@@ -312,6 +317,7 @@ def get_history(user_id: int):
 def add_message(user_id: int, role: str, content: str):
     hist = get_history(user_id)
     hist.append({"role": role, "content": content})
+    # обмежуємо історію
     if len(hist) > 30:
         user_histories[user_id] = hist[-30:]
 
@@ -321,13 +327,21 @@ def add_message(user_id: int, role: str, content: str):
 
 def draw_cards(amount: int):
     names = list(TAROT_CARDS.keys())
+    amount = max(1, min(amount, len(names), 10))  # не більше 10 карт
     chosen = random.sample(names, amount)
     result = []
     for name in chosen:
         upright = random.choice([True, False])
         ua = TAROT_CARDS[name]["ua_name"]
         img_path = TAROT_CARDS[name]["image"]
-        result.append({"code": name, "ua": ua, "upright": upright, "image": img_path})
+        result.append(
+            {
+                "code": name,
+                "ua": ua,
+                "upright": upright,
+                "image": img_path,
+            }
+        )
     return result
 
 
@@ -342,29 +356,124 @@ def load_img(path: str, upright: bool):
     return buf
 
 
-# ================== GPT SYSTEM PROMPT ==================
+# ================== GPT SYSTEM PROMPTS ==================
 
-SYSTEM_PROMPT = """
-Ти — інтуїтивний таролог, але є важливе правило:
+SYSTEM_PROMPT_CORE = """
+Ти — теплий, інтуїтивний таролог-наставник.
+Говориш м'яко, по-людськи, без пафосу, але глибоко й підтримуюче.
 
-❗Ти НІКОЛИ не маєш права називати карту, описувати її, казати «я бачу карту», «я витягнув карту», «переді мною карта» або придумувати карти САМ.
+ГОЛОВНІ ПРАВИЛА:
 
-Ти можеш тільки:
-- запропонувати витягнути карту
-- попросити зробити розклад
-- написати «я готовий глянути карту»
-- написати «я би взяв одну карту для ясності»
+1) Ти НІКОЛИ не вигадуєш карти сам.
+   Ти не можеш називати карту, описувати її чи казати «я бачу карту/витягнув карту»,
+   доки бот не надішле тобі текст на кшталт:
+   «Витягнуті карти:
+    ...».
 
-АЛЕ:
-❗Ти НЕ можеш назвати карту або описати її, доки бот НЕ пришле текст:
-"Витягнуті карти:".
+2) Ти можеш ПРОПОНУВАТИ зробити розклад або витягнути карти:
+   - «Я би запропонував одну карту як підказку на день».
+   - «Для цієї теми добре підійде розклад на три карти».
+   - «Тут варто взяти п'ять карт, щоб побачити ситуацію глибше».
+   - «Для серйозного питання можна зробити Кельтський хрест на 10 карт».
 
-Коли бот прислав "Витягнуті карти:", ти тлумачиш ТІЛЬКИ ці карти.
-Все інше — заборонено.
+   Головне — ти формулюєш це людською мовою,
+   з чітко зазначеною кількістю карт (1, 3, 4, 5 або 10).
 
-Ти не дякуєш за карту, не просиш підтверджень, не говориш «дай знати коли тягнути».
-Ти спілкуєшся тепло, м'яко, інтуїтивно.
+3) Коли бот надсилає тобі:
+   «Витягнуті карти:
+    ...»
+   — ти тлумачиш СТРОГО ці карти.
+   Не додаєш нових карт і не змінюєш їх.
+
+4) Ти НЕ пишеш фраз: 
+   - «Дякую за витягнуті карти»
+   - «Дякую що поділився цими картами»
+   - «Скажи, коли витягнеш карту»
+   - «Я зачекаю на карту від тебе»
+   - «Коли карта буде витягнута, я продовжу»
+
+   Усе відбувається так, ніби магія та розклад вже автоматично виконуються.
+4.1) ніколи не дякуй за карти
+5) Стиль:
+   - Ти дивишся на загальну картину розкладу, показуєш зв'язки між картами.
+   - Пояснюєш м'яко, чесно, без залякувань.
+   - Пам'ятаєш, що Таро — не вирок, а орієнтир.
+   - Коли треба даєш чітку відповідь на питання без води на основі карт
+
+6) Коли ти кажеш який роклад таро ти б зробив на те чи інше питання ніколи не питай чи підходить вам такий тип розкладу таро, просто роби його
+
 """
+
+
+SPREADS_KB_PROMPT = """
+У тебе є база знань про основні розклади Таро, адаптована під консультації в чаті:
+
+1) «Карта дня» — 1 карта.
+   Підходить для запитів:
+   - порада на день
+   - «як прожити цей день»
+   - загальний настрій дня.
+   Структура: 1 карта — основна енергія та підказка.
+
+2) «Три карти» — 3 карти.
+   Дуже універсальний розклад.
+   Варіанти:
+   - Минуле — Теперішнє — Майбутнє.
+   - Що допомагає — Що заважає — Як діяти.
+   Використовуй для:
+   - загальних життєвих ситуацій,
+   - розвитку стосунків,
+   - роботи та особистих рішень.
+
+3) «4 карти для стосунків» — 4 карти.
+   Питання про любов та взаємини.
+   Структура:
+   1 — як виглядають стосунки в цілому;
+   2 — що ви відчуваєте один до одного;
+   3 — що заважає або напружує;
+   4 — можливий розвиток/результат.
+
+4) «5 карт — поглиблений розклад ситуації» — 5 карт.
+   Підійде для серйозніших тем: переїзд, важливі рішення, робота, шлях розвитку.
+   Структура:
+   1 — поточна ситуація;
+   2 — що допомагає / ресурс;
+   3 — що заважає / виклики;
+   4 — приховані фактори / те, чого не видно;
+   5 — можливий напрямок розвитку / результат.
+
+   Також 5 карт можна адаптувати під:
+   - роботу/кар'єру,
+   - стосунки,
+   - внутрішній стан.
+
+5) «Кельтський хрест» — 10 карт.
+   Глибокий, детальний розклад для важливих, комплексних питань.
+   Приблизна структура:
+   1 — поточна ситуація;
+   2 — головний виклик або те, що перехрещує ситуацію;
+   3 — корінь проблеми / глибинна основа;
+   4 — минуле, що вплинуло;
+   5 — те, що над ситуацією / тенденція;
+   6 — найближче майбутнє;
+   7 — ти й твоє ставлення;
+   8 — зовнішні обставини / впливи;
+   9 — надії й побоювання;
+   10 — підсумок / потенційний результат.
+
+Як це використовувати:
+- Спочатку емоційно відгукнись на запит користувача.
+- Потім запропонуй той розклад, який найкраще відповідає ситуації,
+  і чітко скажи, на скільки карт ти пропонуєш розклад:
+  «Я би запропонував розклад на три карти...»
+  «Тут пасує розклад на п'ять карт...»
+  «Можемо зробити Кельтський хрест на десять карт...»
+- Після того як бот витягне карти і надішле список
+  «Витягнуті карти: ...»
+  — тлумач їх цілісно, як один живий малюнок.
+"""
+
+SYSTEM_PROMPT = SYSTEM_PROMPT_CORE + "\n\n" + SPREADS_KB_PROMPT
 
 
 # ================================================================
@@ -379,8 +488,84 @@ EXIT_TEXT = "⬅️ Завершити бесіду"
 
 def dialog_kb():
     return ReplyKeyboardMarkup(
-        resize_keyboard=True, keyboard=[[KeyboardButton(text=EXIT_TEXT)]]
+        resize_keyboard=True,
+        keyboard=[[KeyboardButton(text=EXIT_TEXT)]],
     )
+
+
+# ================== HELPER: DETECT CARD REQUEST ===================
+
+
+def _norm(text: str) -> str:
+    # приведемо до нижнього та замінимо різні апострофи
+    return text.lower().replace("’", "'").replace("‘", "'")
+
+
+def detect_card_request(reply: str) -> int | None:
+    """
+    Повертає кількість карт (1/3/4/5/10), якщо GPT ЯВНО пропонує зробити розклад.
+    Якщо ні — None.
+    """
+    t = _norm(reply)
+
+    # Чи взагалі йдеться про карти / розклад
+    if not any(k in t for k in ["карт", "карта", "карти", "розклад", "позиці"]):
+        return None
+
+    # Чи є дія: тягнути / робити розклад / взяти карти
+    verb_trigger = re.search(
+        r"(розклад|витягн|витягну|витягнемо|тягнут|тягну|тягнемо|візьм|взяти|взяв|гляну|подивлюсь|подивлюся|подивимось|подивимося|зробимо розклад|зробити розклад|пропоную.*розклад|запропонував.*розклад|готовий.*карт)",
+        t,
+    )
+    # окремо дозволяємо «карта дня» навіть без дієслова
+    if not verb_trigger and "карта дня" not in t:
+        return None
+
+    # Спеціальні випадки
+    if "кельтськ" in t or "кельтський хрест" in t:
+        return 10
+
+    # Явні кількості (10 / 5 / 4 / 3 / 1)
+    patterns = [
+        (10, r"(10|десять)\s*(карт|позиці)"),
+        (5, r"(5|п'ять|пять)\s*(карт|позиці)"),
+        (4, r"(4|чотири|чотирьох)\s*(карт|позиці)"),
+        (3, r"(3|три)\s*(карт|позиці)"),
+        (1, r"(1|одну|одна|єдину|єдина)\s*карт"),
+    ]
+    for amount, pat in patterns:
+        if re.search(pat, t):
+            return amount
+
+    # «карта дня»
+    if "карта дня" in t:
+        return 1
+
+    # минуле- теперішнє - майбутнє → 3
+    if "минуле" in t and "теперішн" in t:
+        return 3
+
+    # любовні теми → 4 або 5
+    if any(w in t for w in ["стосунк", "кохан", "відносин"]):
+        if "чотири" in t or "4" in t:
+            return 4
+        # якщо хоче глибше / серйозніше
+        if "глибш" in t or "глибок" in t:
+            return 5
+
+    # «великий розклад», «глибокий розклад» → 10
+    if "великий розклад" in t or "глибокий розклад" in t:
+        return 10
+
+    # якщо просто слово «розклад» без цифри → базово 3 карти
+    if "розклад" in t:
+        return 3
+
+    # запасний варіант: є дієслово і слово «карт» → 1 карта
+    if re.search(r"карт[аеиоуі]", t):
+        return 1
+
+    return None
 
 
 # ================== START DIALOG ===================
@@ -391,11 +576,12 @@ async def start_dialog(message: types.Message, state: FSMContext):
     await state.set_state(TarotChatFSM.chatting)
     user_histories[message.from_user.id] = []  # reset
 
+    # системний промпт з базою знань
     add_message(message.from_user.id, "system", SYSTEM_PROMPT)
 
     welcome = (
         "✨ Я тут. Давай поговоримо так, ніби ти поруч.\n"
-        "Про що хочеш дізнатися сьогодні?"
+        "Можеш запитати про день, стосунки, роботу, вибір або будь-яку ситуацію, яка хвилює."
     )
 
     add_message(message.from_user.id, "assistant", welcome)
@@ -416,109 +602,37 @@ async def exit_dialog(message: types.Message, state: FSMContext):
 
 @dialog_router.message(TarotChatFSM.chatting)
 async def chat(message: types.Message, state: FSMContext):
-
     user_id = message.from_user.id
     text = message.text
 
+    # 1) повідомлення користувача → в історію
     add_message(user_id, "user", text)
 
-    # GPT answer
+    # 2) первинна відповідь GPT (діалог + пропозиція розкладу)
     response = await client.chat.completions.create(
-        model="gpt-4.1-mini", messages=get_history(user_id), max_tokens=4000
+        model="gpt-4.1-mini",
+        messages=get_history(user_id),
+        max_tokens=4000,
     )
 
     reply = response.choices[0].message.content
 
-    # ФІЛЬТР — GPT НЕ МАЄ ПРАВА НАЗИВАТИ КАРТИ ДО ТОГО, ЯК ЇХ НАДІСЛАВ БОТ
-    if re.search(
-        r"(Туз|Король|Королева|Лицар|Паж|Сонце|Місяць|Зірка|Башта|Імператриця|Імператор)",
-        reply,
-        re.IGNORECASE,
-    ):
-        if "Витягнуті карти:" not in reply:
-            # Відповідь GPT залишаємо користувачу,
-            # але НЕ додаємо в історію (щоб не зламати контекст)
-            await message.answer(reply)
-            return
-
+    # 3) зберігаємо й показуємо відповідь
     add_message(user_id, "assistant", reply)
     await message.answer(reply)
 
-    # ========================
-    # DETECT REAL CARD REQUESTS
-    # ========================
+    # 4) дивимось, чи GPT справді хоче РОЗКЛАД
+    amount = detect_card_request(reply)
+    if amount is None or amount <= 0:
+        return  # просто розмова без карт
 
-    # GPT НЕ МАЄ ПРАВА НАЗИВАТИ КАРТИ, якщо бот не прислав карти
-    CARD_WORDS = r"(Туз|Король|Королева|Лицар|Паж|Кубків|Жезлів|Мечів|Пентаклів|Сонце|Місяць|Зірка|Башта|Імператриця|Імператор|Колісниця|Відлюдник|Справедливість|Повішений|Суд|Світ)"
-
-    if re.search(CARD_WORDS, reply, re.IGNORECASE):
-        # якщо в повідомленні НІМАЄ "Витягнуті карти:", GPT збрехав → БЛОКУЄМО
-        if "Витягнуті карти:" not in reply:
-            # надсилаємо ОПИС БЕЗ КАРТ, але НЕ ДАЄМО йому в історію
-            cleaned = re.sub(CARD_WORDS, "⚝", reply)
-            await message.answer(cleaned)
-            return
-
-    # trigger = re.search(r"(витяг|тягн|дай|покаж|розклад|візьм)", reply, re.IGNORECASE)
-
-    # need_1 = re.search(r"\b(1|одну)\s*карт", reply, re.IGNORECASE)
-    # need_3 = re.search(r"\b(3|три)\s*карт", reply, re.IGNORECASE)
-    # need_5 = re.search(r"\b(5|п’ять|пять)\s*карт", reply, re.IGNORECASE)
-
-    # if not trigger:
-    #     return
-
-    # if not (need_1 or need_3 or need_5):
-    #     return
-    # ========================
-    # SMART CARD REQUEST DETECTION
-    # ========================
-
-    # GPT каже, що сам бере карту → ми повинні витягнути
-    trigger = re.search(
-        r"(візьм(у|у)|візьму карту|я візьму|я беру|я відкрию|я відкрив|я витягнув|я витягну|я дістану|гляну карту|гляну карти|глянути карту|глянути карти|погляну карту|подивлюсь карту|подивлюсь карти|подивлюся карту|подивлюся карти|я готовий.*карт|я готовий.*глянут|готуюсь.*карт|готовий.*подивитись|готовий.*подивитися|розклад на|карта для тебе|карти для тебе)",
-        reply,
-        re.IGNORECASE
-    )
-
-
-    # Визначення кількості карт
-    need_1 = re.search(r"(1|одну|одна|єдина)\s*карт", reply, re.IGNORECASE)
-    need_3 = re.search(r"(3|три)\s*карт", reply, re.IGNORECASE)
-    need_5 = re.search(r"(5|п’ять|пять)\s*карт", reply, re.IGNORECASE)
-
-    # Якщо GPT каже, що він "берe карту", але не вказує кількість — беремо 1
-    if trigger and not (need_1 or need_3 or need_5):
-        amount = 1
-    elif need_5:
-        amount = 5
-    elif need_3:
-        amount = 3
-    elif need_1:
-        amount = 1
-    else:
-        return
-
-    # ========================
-    # HOW MANY CARDS?
-    # ========================
-    if need_5:
-        amount = 5
-    elif need_3:
-        amount = 3
-    else:
-        amount = 1
-
-    # ========================
-    # DRAW CARDS
-    # ========================
+    # 5) тягнемо карти
     cards = draw_cards(amount)
 
-    # ========================
-    # SEND CARDS TO USER
-    # ========================
+    # легка "анімація", щоб відчувалося як процес
     await asyncio.sleep(0.3)
 
+    # 6) показуємо карти користувачу
     if len(cards) == 1:
         c = cards[0]
         buf = load_img(c["image"], c["upright"])
@@ -526,7 +640,6 @@ async def chat(message: types.Message, state: FSMContext):
         arrow = "⬆️" if c["upright"] else "⬇️"
         caption = f"{c['ua']} {arrow}"
         await message.answer_photo(photo=file, caption=caption)
-
     else:
         media = []
         for idx, c in enumerate(cards):
@@ -540,9 +653,7 @@ async def chat(message: types.Message, state: FSMContext):
 
         await message.answer_media_group(media)
 
-    # ========================
-    # SEND CARDS BACK TO GPT
-    # ========================
+    # 7) текстовий опис витягнутих карт → GPT
     cards_text = "Витягнуті карти:\n" + "\n".join(
         f"{c['ua']} ({c['code']}) — {'пряма' if c['upright'] else 'перевернута'}"
         for c in cards
@@ -550,9 +661,11 @@ async def chat(message: types.Message, state: FSMContext):
 
     add_message(user_id, "user", cards_text)
 
-    # SECOND GPT PASS — INTERPRETATION
+    # 8) другий виклик GPT — тлумачення розкладу
     follow = await client.chat.completions.create(
-        model="gpt-4.1-mini", messages=get_history(user_id), max_tokens=5000
+        model="gpt-4.1-mini",
+        messages=get_history(user_id),
+        max_tokens=5000,
     )
 
     final_reply = follow.choices[0].message.content
