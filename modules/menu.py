@@ -11,6 +11,9 @@ menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="💬 Діалог з Таро")],
         [KeyboardButton(text="🔮 Живий Таро-чат")],
         [KeyboardButton(text="✅ Так / Ні")],
+        [KeyboardButton(text="➕➖ Плюси / Мінуси")],
+        [KeyboardButton(text="👥 Ти / Інша людина")],
+        [KeyboardButton(text="🍀 Підкова (7 карт)")],
     ],
     resize_keyboard=True,
 )

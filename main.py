@@ -26,7 +26,9 @@ from modules.card_of_day import card_router
 from modules.ask_taro import ask_taro
 from modules.dialog_tarot import dialog_router
 from modules.yes_no import yes_no
-
+from modules.plus_minus import plus_minus
+from modules.you_other import you_other
+from modules.horseshoe import horseshoe
 
 
 bot = Bot(token=config.BOT_TOKEN)
@@ -38,12 +40,16 @@ dp.include_router(card_router)
 dp.include_router(ask_taro)
 dp.include_router(dialog_router)
 dp.include_router(yes_no)
-async def main():
+dp.include_router(plus_minus)
+dp.include_router(you_other)
+dp.include_router(horseshoe)
 
+
+async def main():
     print("🔮 Бот запущено...")
     await dp.start_polling(bot)
 
- 
+
 if __name__ == "__main__":
 
     asyncio.run(main())
