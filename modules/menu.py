@@ -10,6 +10,7 @@ menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="🃏 Карта дня")],
         [KeyboardButton(text="💬 Діалог з Таро")],
         [KeyboardButton(text="🔮 Живий Таро-чат")],
+        [KeyboardButton(text="✅ Так / Ні")],
     ],
     resize_keyboard=True,
 )

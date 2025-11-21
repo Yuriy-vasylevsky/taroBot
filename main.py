@@ -25,7 +25,7 @@ from modules.menu import menu_router
 from modules.card_of_day import card_router
 from modules.ask_taro import ask_taro
 from modules.dialog_tarot import dialog_router
-
+from modules.yes_no import yes_no
 
 
 
@@ -37,7 +37,7 @@ dp.include_router(menu_router)
 dp.include_router(card_router)
 dp.include_router(ask_taro)
 dp.include_router(dialog_router)
-
+dp.include_router(yes_no)
 async def main():
 
     print("🔮 Бот запущено...")
