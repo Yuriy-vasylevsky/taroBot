@@ -5,7 +5,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
+ADMIN_ID = 752963390
 
 if not BOT_TOKEN:
     print("❌ ERROR: BOT_TOKEN not provided!")
