@@ -10,6 +10,11 @@ from modules.user_stats_db import (
     get_users_count,
 )
 
+from aiogram import Router, types
+from aiogram.filters import CommandStart
+from aiogram.types import FSInputFile
+from modules.menu import build_main_menu
+
 admin_router = Router()
 ADMIN_ID = 752963390  # або бери з config.ADMIN_ID
 
@@ -17,6 +22,7 @@ USERS_PER_PAGE = 5  # щоб точно не перелізти 4096 симво�
 
 
 # =============== ХЕЛПЕРИ ===============
+
 
 def _format_last_active(last_active: str | None) -> str:
     """
@@ -135,11 +141,26 @@ async def _render_users_page(page: int) -> tuple[str, InlineKeyboardMarkup | Non
         last_active = _format_last_active(u["last_active_at"])
         actions = u["actions"] or []
 
-        actions_lines = "\n".join(f"   • {a}" for a in actions) or "   • (немає записаних дій)"
+        # Форматування списку дій
+        clean_actions = []
+        for a in u["actions"]:
+            # повністю прибираємо "Натиснув / написав: "
+            if a.startswith("Натиснув / написав: "):
+                a = a.replace("Натиснув / написав: ", "", 1)
+
+            if a.startswith("Inline-кнопка: "):
+                a = a.replace("Inline-кнопка: ", "", 1)
+
+            clean_actions.append(a)
+
+        if clean_actions:
+            actions_lines = "\n".join(f"🔹 {a}" for a in clean_actions)
+        else:
+            actions_lines = "🔸 (немає дій)"
 
         block = (
-            f"<b>#{idx}</b>\n"
-            f"👤 {fname} {uname}\n"
+            # f"<b>#{idx}</b>\n"
+            f"<b>#{idx}.</b>👤 {fname} {uname}\n"
             f"🆔 <code>{uid}</code>\n"
             f"🔋 Енергія: <b>{energy}</b>\n"
             f"🕒 Активність: {last_active}\n"
@@ -154,6 +175,7 @@ async def _render_users_page(page: int) -> tuple[str, InlineKeyboardMarkup | Non
 
 
 # =============== ХЕНДЛЕРИ ===============
+
 
 # Вхід в адмін-панель (якщо не хочеш дублювати з menu.py — можеш цей хендлер видалити)
 @admin_router.message(F.text == "🛠 Адмін-панель")
@@ -207,3 +229,5 @@ async def paginate_users(callback: types.CallbackQuery):
 @admin_router.callback_query(F.data == "admin_users:noop")
 async def noop_pagination(callback: types.CallbackQuery):
     await callback.answer()
+
+

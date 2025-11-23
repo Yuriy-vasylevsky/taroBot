@@ -1,74 +1,43 @@
-# modules/activity_logger.py
-from typing import Callable, Awaitable, Dict, Any, Optional
-
 from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery
+from typing import Callable, Dict, Any, Awaitable
 
 from modules.user_stats_db import track_user_activity
 
 
 class ActivityLoggerMiddleware(BaseMiddleware):
     """
-    Логує всі дії користувачів:
-    - звичайні повідомлення (текст, кнопки, команди)
-    - callback-кнопки
-    - WebApp data
+    Логує:
+    ✔ натискання reply-кнопок
+    ✔ натискання inline-кнопок (callback)
+    ✔ текст, який юзер вводить вручну
     """
 
     async def __call__(
         self,
         handler: Callable[[Any, Dict[str, Any]], Awaitable[Any]],
         event: Any,
-        data: Dict[str, Any],
+        data: Dict[str, Any]
     ) -> Any:
-        user = getattr(event, "from_user", None)
 
-        if user:
-            user_id = user.id
-            username = user.username
-            full_name = user.full_name
-
-            action_text = self._extract_action_text(event)
-            if action_text:
-                try:
-                    print(f"[ActivityLogger] {user_id} -> {action_text}")
-
-                    await track_user_activity(
-                        user_id=user_id,
-                        username=username,
-                        full_name=full_name,
-                        action=action_text,
-                    )
-                except Exception as e:
-                    print(f"[ActivityLogger] DB error: {e}")
-
-        return await handler(event, data)
-
-    def _extract_action_text(self, event: Any) -> Optional[str]:
-        """
-        Формує текст для логування:
-        - Message: текст / тип / WebApp data
-        - CallbackQuery: data
-        """
+        # 1️⃣ Обробка текстових повідомлень (всі, що юзер сам пише або жме reply-кнопку)
         if isinstance(event, Message):
-            if event.web_app_data:
-                raw = event.web_app_data.data or ""
-                if len(raw) > 120:
-                    raw = raw[:117] + "..."
-                return f"WebApp data: {raw}"
-
             if event.text:
-                return f"Message: {event.text}"
+                await track_user_activity(
+                    user_id=event.from_user.id,
+                    username=event.from_user.username,
+                    full_name=event.from_user.full_name,
+                    action=f"Натиснув / написав: {event.text}",
+                )
 
-            if event.caption:
-                return f"Message (caption): {event.caption}"
-
-            return f"Message type: {event.content_type}"
-
+        # 2️⃣ Inline-кнопки (callback_query)
         if isinstance(event, CallbackQuery):
-            data = event.data or ""
-            if len(data) > 120:
-                data = data[:117] + "..."
-            return f"Callback: {data}"
+            await track_user_activity(
+                user_id=event.from_user.id,
+                username=event.from_user.username,
+                full_name=event.from_user.full_name,
+                action=f"Inline-кнопка: {event.data}",
+            )
 
-        return None
+        # Продовжуємо виконання хендлерів
+        return await handler(event, data)

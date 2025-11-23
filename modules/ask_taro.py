@@ -1,9 +1,7 @@
-
 import os
 import json
 import tempfile
 import asyncio
-
 from PIL import Image, ImageDraw, ImageFilter
 from aiogram import Router, F, types
 from aiogram.types import (
@@ -12,16 +10,35 @@ from aiogram.types import (
 )
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-
-from modules.menu import menu
+from modules.menu import menu, popular_menu
 from cards_data import TAROT_CARDS
-
 from openai import AsyncOpenAI
 import config
-
+from modules.user_stats_db import get_energy, change_energy
 
 ask_taro = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+
+# ======================
+#   НАЛАШТУВАННЯ ЕНЕРГІЇ
+# ======================
+ENERGY_COST_DIALOG_3CARDS = 3  # ціна цього розкладу
+
+async def charge_energy_for_spread(user_id: int, cost: int):
+    """
+    Перевірка та списання енергії (без повідомлень в чат):
+    Повертає (ok, value):
+      - ok == True  -> value = новий баланс
+      - ok == False -> value = поточний баланс (нічого не списано)
+    """
+    current = await get_energy(user_id)
+
+    if current < cost:
+        return False, current
+
+    await change_energy(user_id, -cost)
+    new_balance = current - cost
+    return True, new_balance
 
 
 # ======================
@@ -46,7 +63,36 @@ SYSTEM_PROMPT = """
 class TarotDialog(StatesGroup):
     choosing_layout = State()
     waiting_for_question = State()
+    waiting_for_energy = State()
     waiting_for_cards = State()
+
+
+# ======================
+#   ХЕЛПЕРИ ДЛЯ ПОВІДОМЛЕНЬ ДІАЛОГУ
+# ======================
+async def remember_dialog_msg(state: FSMContext, message: types.Message):
+    """
+    Запам'ятати message_id службового повідомлення діалогу.
+    """
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+    ids.append(message.message_id)
+    await state.update_data(dialog_msg_ids=ids)
+
+
+async def clear_dialog_messages(state: FSMContext, bot, chat_id: int):
+    """
+    Видалити всі службові повідомлення діалогу, які зберігаємо в dialog_msg_ids.
+    """
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+
+    for mid in ids:
+        try:
+            await bot.delete_message(chat_id, mid)
+        except Exception:
+            # якщо щось не вийшло (старе/відсутнє) — просто пропускаємо
+            pass
 
 
 # ======================
@@ -144,7 +190,6 @@ def combine_three_cards_with_background(
         cards.append(img)
 
     # --------- Масштабування ---------
-    # Карта займає ~27% ширини фону
     card_w = int(W * 0.27)
     ratio = card_w / cards[0].size[0]
     card_h = int(cards[0].size[1] * ratio)
@@ -179,13 +224,6 @@ async def interpret_cards_gpt(
     cards_display: str,
     layout: dict,
 ) -> str:
-    """
-    layout: {
-      "name": "Проблема — Причина — Рішення",
-      "positions": ["Проблема", "Причина", "Рішення"]
-    }
-    """
-
     layout_block = (
         f"Обраний розклад:\n{layout['name']}\n"
         f"Позиції карт:\n"
@@ -220,9 +258,6 @@ async def interpret_cards_gpt(
 # ======================
 @ask_taro.message(F.text == "💬 Діалог з Таро")
 async def tarot_dialog_start(message: types.Message, state: FSMContext):
-    """
-    1) показуємо інлайн-кнопки вибору розкладу
-    """
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -248,11 +283,14 @@ async def tarot_dialog_start(message: types.Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(TarotDialog.choosing_layout)
-    await message.answer("🔮 Обери тип розкладу:", reply_markup=kb)
+
+    # перше службове повідомлення діалогу
+    msg = await message.answer("🔮 Обери тип розкладу:", reply_markup=kb)
+    await state.update_data(dialog_msg_ids=[msg.message_id])
 
 
 # ======================
-#   ОБРАННЯ РОЗКЛАДУ (INLINE)
+#   ОБРАННЯ РОЗКЛАДУ
 # ======================
 @ask_taro.callback_query(TarotDialog.choosing_layout)
 async def choose_layout(callback: types.CallbackQuery, state: FSMContext):
@@ -265,12 +303,13 @@ async def choose_layout(callback: types.CallbackQuery, state: FSMContext):
 
     await state.update_data(layout=layout)
 
-    await callback.message.answer(
+    msg2 = await callback.message.answer(
         f"🔮 Обрано розклад: <b>{layout['name']}</b>\n\n"
-        "Тепер задай своє питання:",
+        "Тепер сформулюй своє питання до цього розкладу:",
         reply_markup=ReplyKeyboardRemove(),
         parse_mode="HTML",
     )
+    await remember_dialog_msg(state, msg2)
 
     await state.set_state(TarotDialog.waiting_for_question)
     await callback.answer()
@@ -281,14 +320,138 @@ async def choose_layout(callback: types.CallbackQuery, state: FSMContext):
 # ======================
 @ask_taro.message(TarotDialog.waiting_for_question)
 async def tarot_dialog_question(message: types.Message, state: FSMContext):
-    question = message.text.strip()
+    question = (message.text or "").strip()
     if not question:
         await message.answer("Будь ласка, сформулюй питання текстом.")
         return
 
     await state.update_data(question=question)
 
-    kb = types.ReplyKeyboardMarkup(
+    # Інлайн-кнопки "обмінятись енергією" + "назад в меню розкладів"
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_DIALOG_3CARDS}✨)",
+                    callback_data="dialog3_pay",
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⬅️ Повернутись в меню розкладів",
+                    callback_data="dialog3_back",
+                )
+            ],
+        ]
+    )
+
+    msg3 = await message.answer(
+        "✨ Чудово, питання прийнято.\n\n"
+        f"Щоб активувати розклад потрібно <b>«Обмінятись енергією» з колодою</b>.\n\n"
+        f"✨Сфокусуйтесь на своєму питанні✨\n",
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+    await remember_dialog_msg(state, msg3)
+
+    await state.set_state(TarotDialog.waiting_for_energy)
+
+
+# ======================
+#   ОБМІН ЕНЕРГІЄЮ / НАЗАД
+# ======================
+@ask_taro.callback_query(TarotDialog.waiting_for_energy)
+async def tarot_energy_callback(callback: types.CallbackQuery, state: FSMContext):
+    data = callback.data
+    user_id = callback.from_user.id
+    msg = callback.message
+
+    # 🔙 Назад в меню розкладів
+    if data == "dialog3_back":
+        # видаляємо всі службові повідомлення діалогу (вибір розкладу, підтвердження тощо)
+        await clear_dialog_messages(
+            state=state,
+            bot=callback.message.bot,
+            chat_id=callback.message.chat.id,
+        )
+
+        # показуємо меню популярних розкладів
+        await callback.message.bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="📚 Повертаю в меню популярних розкладів.",
+            reply_markup=popular_menu,
+        )
+
+        await state.clear()
+        await callback.answer()
+        return
+
+    # Якщо це не оплата — ігноруємо
+    if data != "dialog3_pay":
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+    # 1) Перевіряємо та списуємо енергію
+    ok, value = await charge_energy_for_spread(
+        user_id,
+        ENERGY_COST_DIALOG_3CARDS,
+    )
+
+    if not ok:
+        current = value
+        await msg.answer(
+            "🔋 У вас зараз недостатньо енергії для цього розкладу.\n"
+            f"Потрібно: <b>{ENERGY_COST_DIALOG_3CARDS}</b> ✨\n"
+            f"У вас є: <b>{current}</b> ✨\n\n",
+            parse_mode="HTML",
+            reply_markup=menu,
+        )
+        return
+
+    # 2) Видаляємо попереднє повідомлення з кнопками
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+    # 3) Анімація "обміну енергією" (≈2 сек)
+    anim_msg = await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="⚡ Обмінюємося енергією з колодою… ✨",
+    )
+
+    try:
+        for i in range(4):  # 4 кроки по 0.5с = 2с
+            bar = "✨" * (i + 1)
+            try:
+                await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+            except Exception:
+                break
+            await asyncio.sleep(0.5)
+    except Exception:
+        pass
+
+    # 4) Ховаємо анімацію
+    try:
+        await anim_msg.delete()
+    except Exception:
+        pass
+
+    # 5) Повідомлення "обмін успішний"
+    left = value
+    await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text=(
+            f"⚡ Обмін енергією успішний!\n"
+            f"Ваша енергія: <b>{left}</b> ✨"
+        ),
+        parse_mode="HTML",
+    )
+
+    # 6) Показуємо кнопку WebApp для вибору 3 карт
+    kb_reply = types.ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [
@@ -302,8 +465,10 @@ async def tarot_dialog_question(message: types.Message, state: FSMContext):
         ],
     )
 
-    await message.answer(
-        "🃏 Тепер обери 3 карти через колоду нижче:", reply_markup=kb
+    await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="🃏 Тепер оберіть 3 карти через колоду нижче:",
+        reply_markup=kb_reply,
     )
 
     await state.set_state(TarotDialog.waiting_for_cards)

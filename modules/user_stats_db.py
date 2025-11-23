@@ -21,7 +21,7 @@ async def init_db():
                 user_id INTEGER UNIQUE,
                 username TEXT,
                 full_name TEXT,
-                energy INTEGER DEFAULT 0,
+                energy INTEGER DEFAULT 12,
                 created_at TEXT DEFAULT (DATETIME('now','localtime')),
                 last_active_at TEXT
             )
