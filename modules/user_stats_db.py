@@ -40,6 +40,18 @@ async def init_db():
             """
         )
 
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS referrals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,         -- кого запросили
+                referrer_id INTEGER,     -- хто запросив
+                rewarded INTEGER DEFAULT 0,   -- чи видана нагорода
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
         await db.commit()
 
 
@@ -85,6 +97,7 @@ async def _upsert_user(
 #         )
 #         await db.commit()
 
+
 async def _log_action(user_id: int, action: str):
     """
     Логує дію користувача й автоматично залишає тільки останні 5.
@@ -112,6 +125,7 @@ async def _log_action(user_id: int, action: str):
         )
 
         await db.commit()
+
 
 # ======================
 #   ПУБЛІЧНІ ФУНКЦІЇ
@@ -244,3 +258,61 @@ async def get_users_with_last_activity_and_actions(
             )
 
         return result
+
+
+# Перевірити чи юзера вже хтось запросив
+async def get_referrer(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT referrer_id FROM referrals WHERE user_id = ?",
+            (user_id,)
+        )
+        row = await cur.fetchone()
+        return row[0] if row else None
+
+
+# Створити запис про реферала
+async def add_referral(user_id: int, referrer_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO referrals (user_id, referrer_id)
+            VALUES (?, ?)
+            """,
+            (user_id, referrer_id)
+        )
+        await db.commit()
+
+
+# Видати нагороду за реферального юзера
+async def reward_referral(referrer_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # шукаємо нероздані реферали
+        cur = await db.execute(
+            """
+            SELECT id FROM referrals
+            WHERE referrer_id = ? AND rewarded = 0
+            """,
+            (referrer_id,)
+        )
+        row = await cur.fetchone()
+
+        if not row:
+            return False  # нема кого винагородити
+
+        ref_id = row[0]
+
+        # видати енергію
+        await db.execute(
+            "UPDATE users SET energy = energy + 12 WHERE user_id = ?",
+            (referrer_id,)
+        )
+
+        # відмітити як видану
+        await db.execute(
+            "UPDATE referrals SET rewarded = 1 WHERE id = ?",
+            (ref_id,)
+        )
+
+        await db.commit()
+        return True

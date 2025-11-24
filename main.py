@@ -17,6 +17,9 @@ from modules.love_dialog import love_taro
 from modules.user_stats_db import init_db
 from modules.admin_panel import admin_router
 from modules.activity_logger import ActivityLoggerMiddleware
+from modules.energy_panel import energy_router
+from modules.start_handler import start_router
+from modules.admin_users import admin_users_router
 
 
 async def main():
@@ -48,7 +51,9 @@ async def main():
     dp.include_router(horseshoe)
     dp.include_router(love_taro)
     dp.include_router(admin_router)
-
+    dp.include_router(energy_router)
+    dp.include_router(start_router)
+    dp.include_router(admin_users_router)
     # 5) Старт
     await bot.delete_webhook(drop_pending_updates=True)
     print("✅ Бот запущено, слухаю апдейти...")

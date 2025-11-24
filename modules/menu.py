@@ -1,4 +1,3 @@
-
 from aiogram import Router, types, F
 from aiogram.filters import CommandStart
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
@@ -9,7 +8,7 @@ import config
 menu_router = Router()
 
 VIEW_ALL_CARDS_URL = "https://yuriy-vasylevsky.github.io/webOllcads"
-ADMIN_ID = config.ADMIN_ID   # твоє значення 752963390
+ADMIN_ID = config.ADMIN_ID  # твоє значення 752963390
 
 
 # ======================
@@ -27,7 +26,8 @@ def build_main_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
     # Основні кнопки
     rows.extend(
         [
-            [KeyboardButton(text="🃏 Карта дня")],
+            # [KeyboardButton(text="🃏 Карта дня")],
+            [KeyboardButton(text="⚡ Поповнити енергію")],
             [KeyboardButton(text="🔮 Живий Таро-чат")],
             [KeyboardButton(text="📚 Популярні розклади")],
             [
@@ -71,8 +71,7 @@ popular_menu = ReplyKeyboardMarkup(
 def admin_menu() -> ReplyKeyboardMarkup:
     keyboard = [
         ["👥 Користувачі"],
-        ["📈 Активність"],
-        ["💰 Енергія користувачів"],
+        ["⚡ Енергія користувачів"],
         ["🔙 Назад в меню"],
     ]
 
@@ -85,14 +84,14 @@ def admin_menu() -> ReplyKeyboardMarkup:
 # ======================
 #   /start
 # ======================
-@menu_router.message(CommandStart())
-async def start_cmd(message: types.Message):
-    kb = build_main_menu(message.from_user.id)
+# @menu_router.message(CommandStart())
+# async def start_cmd(message: types.Message):
+#     kb = build_main_menu(message.from_user.id)
 
-    await message.answer(
-        "🔮 Вітаю у Таро-боті!\nОбери те, що тобі відгукується прямо зараз:",
-        reply_markup=kb,
-    )
+#     await message.answer(
+#         "🔮 Вітаю у Таро-боті!\nОбери те, що тобі відгукується прямо зараз:",
+#         reply_markup=kb,
+#     )
 
 
 # ======================
