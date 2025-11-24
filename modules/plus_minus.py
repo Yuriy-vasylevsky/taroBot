@@ -10,14 +10,37 @@ from aiogram.fsm.state import State, StatesGroup
 
 from PIL import Image, ImageDraw, ImageFilter
 
-from modules.menu import menu
+from modules.menu import menu, build_main_menu
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
 
+from modules.user_stats_db import get_energy, change_energy
+
 
 plus_minus = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+
+
+# ======================
+#    ЕНЕРГІЯ
+# ======================
+ENERGY_COST_PLUS_MINUS = 2  # ціна розкладу "Плюси / Мінуси"
+
+
+async def charge_energy_for_plusminus(user_id: int, cost: int):
+    """
+    Перевірка та списання енергії для розкладу "Плюси / Мінуси".
+    Повертає (ok, value):
+      - ok == True  -> value = новий баланс
+      - ok == False -> value = поточний баланс (нічого не списано)
+    """
+    current = await get_energy(user_id)
+    if current < cost:
+        return False, current
+
+    await change_energy(user_id, -cost)
+    return True, current - cost
 
 
 # ======================
@@ -46,6 +69,7 @@ SYSTEM_PROMPT_PLUS_MINUS = """
 # ======================
 class PlusMinusFSM(StatesGroup):
     waiting_for_question = State()
+    waiting_for_energy = State()
     waiting_for_cards = State()
 
 
@@ -169,6 +193,7 @@ async def plusminus_start(message: types.Message, state: FSMContext):
     """
     Старт: питаємо формулювати ситуацію / вибір.
     """
+    await state.clear()
     await state.set_state(PlusMinusFSM.waiting_for_question)
     await message.answer(
         "❓ Сформулюй ситуацію або вибір, який хочеш зважити (плюси та мінуси).",
@@ -181,14 +206,133 @@ async def plusminus_start(message: types.Message, state: FSMContext):
 # ======================
 @plus_minus.message(PlusMinusFSM.waiting_for_question)
 async def plusminus_question(message: types.Message, state: FSMContext):
-    question = message.text.strip()
+    question = (message.text or "").strip()
     if not question:
         await message.answer("Будь ласка, напиши питання текстом 🙏")
         return
 
     await state.update_data(question=question)
 
-    kb = types.ReplyKeyboardMarkup(
+    # Інлайн-кнопки для обміну енергією або виходу в меню
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_PLUS_MINUS}✨)",
+                    callback_data="pm_pay",
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⬅️ Повернутись в головне меню",
+                    callback_data="pm_back",
+                )
+            ],
+        ]
+    )
+
+    await message.answer(
+        "✨ Чудово, питання прийнято.\n\n"
+        "Щоб активувати розклад, треба обмінятись енергією з колодою ✨",
+        reply_markup=kb,
+    )
+
+    await state.set_state(PlusMinusFSM.waiting_for_energy)
+
+
+# ======================
+#   ОБМІН ЕНЕРГІЄЮ / НАЗАД
+# ======================
+@plus_minus.callback_query(PlusMinusFSM.waiting_for_energy)
+async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMContext):
+    data = callback.data
+    user_id = callback.from_user.id
+    msg = callback.message
+
+    # 🔙 Назад в меню
+    if data == "pm_back":
+        # Видаляємо повідомлення з кнопками
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+
+        kb = build_main_menu(user_id)
+        await callback.message.bot.send_message(
+            chat_id=msg.chat.id,
+            text="🔙 Повертаю в головне меню.",
+            reply_markup=kb,
+        )
+
+        await state.clear()
+        await callback.answer()
+        return
+
+    if data != "pm_pay":
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+    # 1) Перевірка та списання енергії
+    ok, value = await charge_energy_for_plusminus(
+        user_id,
+        ENERGY_COST_PLUS_MINUS,
+    )
+
+    if not ok:
+        current = value
+        await msg.answer(
+            "🔋 У вас недостатньо енергії для цього розкладу.\n"
+            f"Потрібно: <b>{ENERGY_COST_PLUS_MINUS}</b> ✨\n"
+            f"У вас є: <b>{current}</b> ✨",
+            parse_mode="HTML",
+            reply_markup=menu,
+        )
+        return
+
+    # 2) Видаляємо попереднє повідомлення з кнопками
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+    # 3) Анімація обміну енергією (~2 сек)
+    anim_msg = await callback.message.bot.send_message(
+        chat_id=msg.chat.id,
+        text="⚡ Обмінюємося енергією… ✨",
+    )
+
+    try:
+        for i in range(4):  # 4 кроки по 0.5с = 2с
+            bar = "✨" * (i + 1)
+            try:
+                await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+            except Exception:
+                break
+            await asyncio.sleep(0.5)
+    except Exception:
+        pass
+
+    # 4) Ховаємо анімацію
+    try:
+        await anim_msg.delete()
+    except Exception:
+        pass
+
+    # 5) Повідомлення про успішний обмін
+    left = value
+    await callback.message.bot.send_message(
+        chat_id=msg.chat.id,
+        text=(
+            f"⚡ Обмін енергією успішний!\n"
+            f"Ваша енергія: <b>{left}</b> ✨"
+        ),
+        parse_mode="HTML",
+    )
+
+    # 6) Показуємо кнопку WebApp для вибору 2 карт
+    kb_reply = types.ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [
@@ -202,9 +346,12 @@ async def plusminus_question(message: types.Message, state: FSMContext):
         ],
     )
 
-    await message.answer(
-        "🃏 Тепер обери 2 карти через колоду нижче:", reply_markup=kb
+    await callback.message.bot.send_message(
+        chat_id=msg.chat.id,
+        text="🃏 Тепер обери 2 карти через колоду нижче:",
+        reply_markup=kb_reply,
     )
+
     await state.set_state(PlusMinusFSM.waiting_for_cards)
 
 
