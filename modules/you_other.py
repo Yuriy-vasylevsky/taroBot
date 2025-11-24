@@ -10,14 +10,30 @@ from aiogram.fsm.state import State, StatesGroup
 
 from PIL import Image, ImageDraw, ImageFilter
 
-from modules.menu import menu
+from modules.menu import menu, build_main_menu
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
 
+from modules.user_stats_db import get_energy, change_energy
+
 
 you_other = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+
+
+# ======================
+#   ЕНЕРГІЯ
+# ======================
+ENERGY_COST_YOUOTHER = 2
+
+
+async def charge_energy(user_id: int, cost: int):
+    current = await get_energy(user_id)
+    if current < cost:
+        return False, current
+    await change_energy(user_id, -cost)
+    return True, current - cost
 
 
 # ======================
@@ -27,19 +43,16 @@ SYSTEM_PROMPT_YOU_OTHER = """
 Ти — досвідчений таролог-психолог.
 
 Розклад "Ти — Інша людина" складається з 2 карт:
-1 — Ти (емоції, наміри, очікування, внутрішній стан)
-2 — Інша людина (її емоції, наміри, очікування, внутрішній стан)
+1 — Ти (емоції, наміри, очікування)
+2 — Інша людина (її емоції, наміри, очікування)
 
-Твоє завдання — допомогти людині зрозуміти динаміку між ними:
-де взаємність, де напруга, де нерівновага, де надія.
-
-Пиши українською або російською, як звертаються.
-Структура відповіді:
-1) 🔮 Динаміка між вами (короткий підсумок)
-2) 🧩 Ти — розбір першої карти (що ти відчуваєш, як виглядаєш у цій ситуації)
-3) 🧩 Інша людина — розбір другої карти (що відчуває вона/він, як бачить ситуацію)
-4) 🌙 Висновок (що між вами зараз, куди це може рухатися)
-5) 💛 Порада (як краще поводитись, на що звернути увагу, що може покращити контакт)
+Пиши тепло, емпатійно, без категоричних прогнозів.
+Структура:
+1) 🔮 Динаміка між вами
+2) 🧩 Ти — розбір першої карти
+3) 🧩 Інша людина — розбір другої карти
+4) 🌙 Висновок
+5) 💛 Порада
 """
 
 
@@ -48,86 +61,63 @@ SYSTEM_PROMPT_YOU_OTHER = """
 # ======================
 class YouOtherFSM(StatesGroup):
     waiting_for_question = State()
+    waiting_for_energy = State()
     waiting_for_cards = State()
 
 
 # ======================
 #   КОМБІНАЦІЯ 2 КАРТ
 # ======================
-def combine_you_other_cards(paths, uprights, background: str = "background.png") -> str:
-    """
-    Об'єднує 2 карти на PNG-фоні:
-    - трохи обрізає поля
-    - округлює кути
-    - додає тінь (ефект "піднятої" карти)
-    - центрує 2 карти по центру стола
-    Повертає шлях до тимчасового PNG-файлу.
-    """
+def combine_you_other_cards(paths, uprights, background="background.png") -> str:
 
     bg = Image.open(background).convert("RGBA")
     W, H = bg.size
 
-    def crop_1mm(img: Image.Image) -> Image.Image:
+    def crop(img):
         dpi = img.info.get("dpi", (300, 300))[0]
         px = int((1 * dpi) / 25.4)
-        w, h = img.size
-        if px <= 0 or px * 2 >= min(w, h):
-            return img
-        return img.crop((px, px, w - px, h - px))
+        return img.crop((px, px, img.size[0]-px, img.size[1]-px))
 
-    def round_corners(img: Image.Image, radius: int = 45) -> Image.Image:
+    def round_corners(img, radius=45):
         mask = Image.new("L", img.size, 0)
         draw = ImageDraw.Draw(mask)
         draw.rounded_rectangle((0, 0, img.size[0], img.size[1]), radius, fill=255)
-        out = Image.new("RGBA", img.size)
-        out.paste(img, (0, 0), mask)
-        return out
+        result = Image.new("RGBA", img.size)
+        result.paste(img, mask=mask)
+        return result
 
-    def add_shadow(
-        img: Image.Image,
-        offset=(12, 18),
-        blur: int = 32,
-        opacity: int = 160,
-        radius: int = 45,
-    ) -> Image.Image:
+    def add_shadow(img, offset=(12, 18), blur=32):
         w, h = img.size
-        shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        mask = Image.new("L", (w, h), 0)
-        draw = ImageDraw.Draw(mask)
-        draw.rounded_rectangle((0, 0, w, h), radius, fill=opacity)
-        shadow.paste((0, 0, 0, opacity), (0, 0), mask)
+        shadow = Image.new("RGBA", (w, h), (0, 0, 0, 160))
         shadow = shadow.filter(ImageFilter.GaussianBlur(blur))
 
         layer = Image.new("RGBA", (w + offset[0], h + offset[1]), (0, 0, 0, 0))
-        layer.alpha_composite(shadow, offset)
-        layer.alpha_composite(img, (0, 0))
+        layer.paste(shadow, offset, shadow)
+        layer.paste(img, (0, 0), img)
         return layer
 
     cards = []
-    for path, up in zip(paths, uprights):
-        img = Image.open(path).convert("RGBA")
-        img = crop_1mm(img)
-        if not up:
+    for p, u in zip(paths, uprights):
+        img = Image.open(p).convert("RGBA")
+        img = crop(img)
+        if not u:
             img = img.rotate(180, expand=True)
         img = round_corners(img)
         img = add_shadow(img)
         cards.append(img)
 
-    # Масштаб: ~26% ширини фону
-    card_w = int(W * 0.26)
-    ratio = card_w / cards[0].size[0]
-    card_h = int(cards[0].size[1] * ratio)
-    cards = [c.resize((card_w, int(card_h * 1.05)), Image.LANCZOS) for c in cards]
+    cw = int(W * 0.26)
+    ratio = cw / cards[0].size[0]
+    ch = int(cards[0].size[1] * ratio)
+    cards = [c.resize((cw, int(ch * 1.05)), Image.LANCZOS) for c in cards]
 
     spacing = int(W * 0.05)
-    total_width = card_w * 2 + spacing
+    total_width = cw * 2 + spacing
     start_x = (W - total_width) // 2
-    y = (H - card_h) // 2
+    y = (H - ch) // 2
 
-    positions = [start_x, start_x + card_w + spacing]
-
-    for img, x in zip(cards, positions):
-        bg.alpha_composite(img, (x, y))
+    for i, c in enumerate(cards):
+        bg.alpha_composite(c, (start_x + i * (cw + spacing), y))
 
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     bg.save(temp.name, "PNG")
@@ -135,19 +125,15 @@ def combine_you_other_cards(paths, uprights, background: str = "background.png")
 
 
 # ======================
-#  GPT "ТИ / ІНША ЛЮДИНА"
+#  GPT
 # ======================
 async def interpret_you_other(question: str, cards_display: str) -> str:
-    """
-    cards_display:
-    1. ... (Ти)
-    2. ... (Інша людина)
-    """
+
     prompt = (
         f"{SYSTEM_PROMPT_YOU_OTHER}\n\n"
-        f"Питання користувача:\n{question}\n\n"
-        f"Карти розкладу:\n{cards_display}\n\n"
-        "Опиши щиро, емпатійно, з фокусом на почуттях та динаміці між людьми."
+        f"Питання:\n{question}\n\n"
+        f"Карти:\n{cards_display}\n\n"
+        "Опиши динаміку між людьми чесно, м'яко, емпатійно."
     )
 
     resp = await client.chat.completions.create(
@@ -168,12 +154,11 @@ async def interpret_you_other(question: str, cards_display: str) -> str:
 # ======================
 @you_other.message(F.text == "👥 Ти / Інша людина")
 async def youother_start(message: types.Message, state: FSMContext):
-    """
-    Старт розкладу: питаємо про стосунок / ситуацію між двома людьми.
-    """
+    await state.clear()
     await state.set_state(YouOtherFSM.waiting_for_question)
+
     await message.answer(
-        "❓ Розкажи, про які стосунки або ситуацію між тобою та іншою людиною ти хочеш дізнатися.",
+        "❓ Про які стосунки або ситуацію між тобою і іншою людиною хочеш дізнатися?",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -184,12 +169,103 @@ async def youother_start(message: types.Message, state: FSMContext):
 @you_other.message(YouOtherFSM.waiting_for_question)
 async def youother_question(message: types.Message, state: FSMContext):
     question = message.text.strip()
-    if not question:
-        await message.answer("Будь ласка, напиши питання текстом 🙏")
-        return
-
     await state.update_data(question=question)
 
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_YOUOTHER}✨)",
+                    callback_data="youother_pay"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⬅️ Повернутись в меню",
+                    callback_data="youother_back"
+                )
+            ],
+        ]
+    )
+
+    await message.answer(
+        "✨ Щоб зробити розклад, потрібно обмінятись енергією.",
+        reply_markup=kb,
+    )
+
+    await state.set_state(YouOtherFSM.waiting_for_energy)
+
+
+# ======================
+#  ОПЛАТА / НАЗАД
+# ======================
+@you_other.callback_query(YouOtherFSM.waiting_for_energy)
+async def youother_energy_callback(callback: types.CallbackQuery, state: FSMContext):
+    data = callback.data
+    user_id = callback.from_user.id
+    msg = callback.message
+
+    # 🔙 Назад
+    if data == "youother_back":
+        try:
+            await msg.delete()
+        except:
+            pass
+
+        kb = build_main_menu(user_id)
+        await callback.message.bot.send_message(
+            msg.chat.id,
+            "🔙 Повертаю в головне меню.",
+            reply_markup=kb,
+        )
+        await state.clear()
+        await callback.answer()
+        return
+
+    if data != "youother_pay":
+        await callback.answer()
+        return
+
+    # Списання енергії
+    ok, new_balance = await charge_energy(user_id, ENERGY_COST_YOUOTHER)
+    if not ok:
+        await msg.answer(
+            f"🔋 Недостатньо енергії.\n"
+            f"Потрібно: {ENERGY_COST_YOUOTHER}✨\n"
+            f"У вас: {new_balance}✨"
+        )
+        return
+
+    # Видаляємо старе
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # Анімація
+    anim = await callback.message.bot.send_message(
+        msg.chat.id,
+        "⚡ Обмінюємося енергією…"
+    )
+    try:
+        for i in range(4):
+            await anim.edit_text(f"⚡ Обмінюємося енергією… {'✨'*(i+1)}")
+            await asyncio.sleep(0.5)
+    except:
+        pass
+
+    try:
+        await anim.delete()
+    except:
+        pass
+
+    await callback.message.bot.send_message(
+        msg.chat.id,
+        f"✨ Обмін успішний!\nВаша енергія: <b>{new_balance}</b>✨",
+        parse_mode="HTML",
+    )
+
+    # Кнопка WebApp
     kb = types.ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
@@ -204,94 +280,67 @@ async def youother_question(message: types.Message, state: FSMContext):
         ],
     )
 
-    await message.answer(
-        "🃏 Тепер обери 2 карти через колоду нижче:", reply_markup=kb
+    await callback.message.bot.send_message(
+        msg.chat.id,
+        "🃏 Тепер оберіть 2 карти:",
+        reply_markup=kb,
     )
+
     await state.set_state(YouOtherFSM.waiting_for_cards)
+    await callback.answer()
 
 
 # ======================
-#      КАРТИ З WEBAPP
+#      КАРТИ
 # ======================
 @you_other.message(YouOtherFSM.waiting_for_cards, F.web_app_data)
 async def youother_cards(message: types.Message, state: FSMContext):
     data = json.loads(message.web_app_data.data)
     print("[DEBUG] YOU_OTHER WEBAPP:", data)
 
-    action = data.get("action")
-    if action not in ("two_cards", "three_cards"):
-        return
-
     chosen = data.get("chosen", [])
     if len(chosen) != 2:
-        await message.answer("Для розкладу 'Ти — Інша людина' потрібно саме 2 карти.")
+        await message.answer("Для цього розкладу потрібно саме 2 карти.")
         return
 
     state_data = await state.get_data()
     question = state_data.get("question")
-    if not question:
-        await message.answer("Щось пішло не так. Спробуй почати розклад заново.")
-        await state.clear()
-        return
 
-    img_paths: list[str] = []
-    uprights: list[bool] = []
-    cards_display: list[str] = []
+    img_paths = []
+    uprights = []
+    cards_display = []
 
-    # 1 — Ти, 2 — Інша людина
-    positions_label = ["(Ти)", "(Інша людина)"]
+    labels = ["(Ти)", "(Інша людина)"]
 
     for i, card in enumerate(chosen, start=1):
-        eng_name = card["name"]
-        upright = card["upright"]
-
-        info = TAROT_CARDS.get(eng_name)
-        if not info:
-            continue
+        info = TAROT_CARDS.get(card["name"])
+        arrow = "⬆️" if card["upright"] else "⬇️"
 
         img_paths.append(info["image"])
-        uprights.append(upright)
+        uprights.append(card["upright"])
+        cards_display.append(f"{i}. {info['ua_name']} {arrow} {labels[i-1]}")
 
-        ua = info["ua_name"]
-        arrow = "⬆️" if upright else "⬇️"
-        label = positions_label[i - 1]
-        cards_display.append(f"{i}. {ua} {arrow} {label}")
-
-    if len(img_paths) != 2:
-        await message.answer("Не вдалося завантажити обидві карти.")
-        await state.clear()
-        return
-
-    # 1️⃣ Комбінуємо 2 карти в одне зображення
-    final_img = combine_you_other_cards(
-        img_paths,
-        uprights,
-        background="background.png",  # твій фон "таро-стіл"
-    )
+    final = combine_you_other_cards(img_paths, uprights)
 
     await message.answer_photo(
-        FSInputFile(final_img),
+        FSInputFile(final),
         caption="🔮 Розклад: Ти — Інша людина",
     )
 
-    # 2️⃣ Анімація "аналіз..."
     load = await message.answer("🔮 Читаю, що між вами…")
 
     async def anim():
         i = 0
         while True:
             try:
-                await load.edit_text(
-                    "🔮 Читаю, що між вами…\n" + "🔮" * ((i % 5) + 1)
-                )
-            except Exception:
+                await load.edit_text("🔮 Читаю…\n" + "🔮"*((i%5)+1))
+            except:
                 break
             i += 1
             await asyncio.sleep(0.25)
 
     task = asyncio.create_task(anim())
 
-    # 3️⃣ GPT
     try:
         interpretation = await interpret_you_other(
             question, "\n".join(cards_display)
@@ -300,13 +349,12 @@ async def youother_cards(message: types.Message, state: FSMContext):
         task.cancel()
         try:
             await load.delete()
-        except Exception:
+        except:
             pass
 
-    # 4️⃣ Відповідь юзеру
     await message.answer(
         f"<b>❓ Питання:</b> {question}\n\n"
-        f"<b>👥 Розклад: Ти — Інша людина</b>\n"
+        f"<b>👥 Розклад:</b> Ти — Інша людина\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{interpretation}",
         parse_mode="HTML",
@@ -314,8 +362,8 @@ async def youother_cards(message: types.Message, state: FSMContext):
     )
 
     try:
-        os.remove(final_img)
-    except Exception:
+        os.remove(final)
+    except:
         pass
 
     await state.clear()
