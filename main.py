@@ -6,14 +6,14 @@ from aiogram.client.default import DefaultBotProperties
 import config
 
 from modules.menu import menu_router
-from modules.card_of_day import card_router
-from modules.ask_taro import ask_taro
-from modules.dialog_tarot import dialog_router
-from modules.yes_no import yes_no
-from modules.plus_minus import plus_minus
-from modules.you_other import you_other
-from modules.horseshoe import horseshoe
-from modules.love_dialog import love_taro
+from taro.card_of_day import card_router
+from taro.ask_taro import ask_taro
+from taro.dialog_tarot import dialog_router
+from taro.yes_no import yes_no
+from taro.plus_minus import plus_minus
+from taro.you_other import you_other
+from taro.horseshoe import horseshoe
+from taro.love_dialog import love_taro
 from modules.user_stats_db import init_db
 from modules.admin_panel import admin_router
 from modules.activity_logger import ActivityLoggerMiddleware

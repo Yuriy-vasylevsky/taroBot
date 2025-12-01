@@ -8,7 +8,7 @@ import config
 menu_router = Router()
 
 VIEW_ALL_CARDS_URL = "https://yuriy-vasylevsky.github.io/webOllcads"
-ADMIN_ID = config.ADMIN_ID  # твоє значення 752963390
+ADMIN_ID = config.ADMIN_ID 
 
 
 # ======================
@@ -51,6 +51,7 @@ menu = build_main_menu()
 # ======================
 popular_menu = ReplyKeyboardMarkup(
     keyboard=[
+        [KeyboardButton(text="🃏 Карта дня")],
         [KeyboardButton(text="💬 Діалог з Таро")],
         [KeyboardButton(text="❤️ Любов / Стосунки")],
         [
