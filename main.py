@@ -2,9 +2,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-
 import config
-
 from modules.menu import menu_router
 from taro.card_of_day import card_router
 from taro.ask_taro import ask_taro
