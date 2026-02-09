@@ -29,7 +29,7 @@ async def main():
     # 2) Бот і диспетчер
     bot = Bot(
         token=config.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),  
     )
     dp = Dispatcher()
 
