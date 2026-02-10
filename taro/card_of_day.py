@@ -1,22 +1,70 @@
 
+from modules.menu import popular_menu
 import json
 import asyncio
+import aiosqlite
 from aiogram import Router, types, F
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
-from modules.menu import menu
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, FSInputFile, BufferedInputFile
 from PIL import Image
 import io
-from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
+from datetime import datetime
+from typing import Optional
+from cards_data import TAROT_CARDS
 import config
 
-
+# Ініціалізація
 card_router = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 
 WEBAPP_URL = "https://yuriy-vasylevsky.github.io/tarot-webapp/"
+DB_PATH = "tarot_users.db"
+
+# Шляхи до зображень для сповіщень
+CARD_LIMIT_IMAGE = "assets/77.png"  # Коли карта вже витягнута
+CARD_TIME_OVER_IMAGE = "assets/77.png"  # Коли час минув (після 14:00)
 
 
+# ======================
+#  ФУНКЦІЇ БАЗИ ДАНИХ
+# ======================
+
+
+async def can_pick_card(user_id: int) -> bool:
+    """Перевіряє, чи можна витягнути карту до 14 години дня, і чи ще не витягнута картка цього дня."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT last_card_picked_at FROM users WHERE user_id = ?", (user_id,)
+        )
+        row = await cur.fetchone()
+
+    current_time = datetime.now()
+
+    if row and row[0]:
+        last_card_time = datetime.fromisoformat(row[0])
+
+        # Перевірка, чи картка була витягнута цього дня після 14 годин
+        if last_card_time.date() == current_time.date():
+            if last_card_time.hour >= 14:
+                return False  # Картку можна витягнути лише до 14 годин того ж дня
+            return False  # Якщо картка вже була витягнута цього дня, не дозволяємо повторно витягнути її
+
+    return True  # Картку можна витягнути, якщо ще не витягувалась сьогодні
+
+
+async def update_last_card_picked_time(user_id: int):
+    """Оновлює час останнього витягування карти для користувача."""
+    now = datetime.now().isoformat(sep=" ", timespec="seconds")
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET last_card_picked_at = ? WHERE user_id = ?", (now, user_id)
+        )
+        await db.commit()
+
+
+# ======================
+#  ЗАВАНТАЖЕННЯ КАРТИ
+# ======================
 def load_card_image(path: str, upright: bool):
     """Створює BytesIO з перевернутою/прямою карткою."""
     img = Image.open(path)
@@ -29,8 +77,29 @@ def load_card_image(path: str, upright: bool):
     return buf
 
 
+def load_notification_image(path: str) -> Optional[BufferedInputFile]:
+    """
+    Завантажує PNG-зображення для сповіщення.
+    
+    Args:
+        path: Шлях до PNG файлу
+        
+    Returns:
+        BufferedInputFile або None якщо файл не знайдено
+    """
+    try:
+        with open(path, "rb") as f:
+            img_bytes = f.read()
+        return BufferedInputFile(img_bytes, filename="notification.png")
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load notification image {path}: {e}")
+        return None
+
+
 # ======================
-# SYSTEM PROMPT GPT
+#  SYSTEM PROMPT GPT
 # ======================
 SYSTEM_PROMPT = """
 Ти — досвідчений містичний таролог-наставник.
@@ -58,17 +127,59 @@ async def interpret_card(display_name: str):
             {"role": "user", "content": prompt},
         ],
         max_tokens=450,
-        temperature=0.9
+        temperature=0.9,
     )
 
     return completion.choices[0].message.content
 
 
-# ===============================
-#   КНОПКА "КАРТА ДНЯ"
-# ===============================
+# ======================
+#  КНОПКА "КАРТА ДНЯ"
+# ======================
+
 @card_router.message(F.text == "🃏 Карта дня")
 async def open_tarot_webapp(message: types.Message):
+    """Обробка кнопки для витягування карти дня."""
+    user_id = message.from_user.id
+    current_time = datetime.now()
+
+    # Перевірка часу (після 14:00)
+    if current_time.hour >= 14:
+        notification_img = load_notification_image(CARD_TIME_OVER_IMAGE)
+        
+        if notification_img:
+            await message.answer_photo(
+                photo=notification_img,
+                caption="⚠️ Карта дня більше не доступна сьогодні.\n"
+                        "🌅 Спробуй знову завтра до 14:00.",
+                parse_mode="HTML"
+            )
+        else:
+            await message.answer(
+                "⚠️ Карта дня більше не доступна сьогодні.\n"
+                "🌅 Спробуй знову завтра до 14:00."
+            )
+        return
+
+    # Перевірка, чи можна витягнути карту
+    if not await can_pick_card(user_id):
+        notification_img = load_notification_image(CARD_LIMIT_IMAGE)
+        
+        if notification_img:
+            await message.answer_photo(
+                photo=notification_img,
+                caption="⚠️ Карта дня доступна лише один раз на день до 14:00.\n"
+                        "✨ Твоя карта вже чекає на тебе завтра!",
+                parse_mode="HTML"
+            )
+        else:
+            await message.answer(
+                "⚠️ Карта дня доступна лише один раз на день до 14:00.\n"
+                "✨ Твоя карта вже чекає на тебе завтра!"
+            )
+        return
+
+    # Якщо все ок - показуємо WebApp
     markup = ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
@@ -81,20 +192,24 @@ async def open_tarot_webapp(message: types.Message):
         ],
     )
     await message.answer(
-        "🔮 Обери карту дня через інтерактивну колоду:", reply_markup=markup
+        "🔮 Обери карту дня через інтерактивну колоду:", 
+        reply_markup=markup
     )
 
+    # Оновлюємо час останнього витягування карти
+    await update_last_card_picked_time(user_id)
 
-# ===============================
-#       ОБРОБКА WEBAPP
-# ===============================
+
+# ======================
+#  ОБРОБКА WEBAPP
+# ======================
 @card_router.message(
     F.web_app_data.func(
         lambda d: d and d.data and json.loads(d.data).get("action") == "pick_card"
     )
 )
 async def on_webapp_data(message: types.Message):
-
+    """Обробка даних після вибору карти в веб-додатку."""
     try:
         data = json.loads(message.web_app_data.data)
         print("[DEBUG] WebApp:", data)
@@ -106,7 +221,7 @@ async def on_webapp_data(message: types.Message):
         card_name = chosen["name"]
         upright = chosen["upright"]
 
-        # --- 1️⃣ Тягнемо картку з TAROT_CARDS ---
+        # --- Тягнемо картку з TAROT_CARDS ---
         card_info = TAROT_CARDS.get(card_name)
         if not card_info:
             await message.answer("⚠️ Невідома карта.")
@@ -117,7 +232,7 @@ async def on_webapp_data(message: types.Message):
         orientation = "⬆️" if upright else "⬇️"
         display_name = f"{card_ua} {orientation}"
 
-        # --- 2️⃣ Фото картки ---
+        # --- Фото картки ---
         card_img = load_card_image(img_path, upright)
 
         await message.answer_photo(
@@ -126,7 +241,7 @@ async def on_webapp_data(message: types.Message):
             parse_mode="HTML",
         )
 
-        # --- 3️⃣ Бананова анімація ---
+        # --- Бананова анімація ---
         load_msg = await message.answer("🍌 Завантаження тлумачення…")
 
         async def banana_anim():
@@ -142,21 +257,21 @@ async def on_webapp_data(message: types.Message):
 
         anim_task = asyncio.create_task(banana_anim())
 
-        # --- 4️⃣ GPT ТЛУМАЧЕННЯ (Без n8n!) ---
+        # --- GPT ТЛУМАЧЕННЯ ---
         interpretation = await interpret_card(display_name)
 
-        # --- 5️⃣ Stop animation ---
+        # --- Stop animation ---
         anim_task.cancel()
         try:
             await load_msg.delete()
         except:
             pass
 
-        # --- 6️⃣ Відповідь ---
+        # --- Відповідь ---
         await message.answer(
             f"<b>{display_name}</b>\n\n{interpretation}",
             parse_mode="HTML",
-            reply_markup=menu,
+            reply_markup=popular_menu,
         )
 
     except Exception as e:

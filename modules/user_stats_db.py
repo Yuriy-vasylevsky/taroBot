@@ -23,7 +23,8 @@ async def init_db():
                 full_name TEXT,
                 energy INTEGER DEFAULT 12,
                 created_at TEXT DEFAULT (DATETIME('now','localtime')),
-                last_active_at TEXT
+                last_active_at TEXT,
+                last_card_picked_at TEXT  -- нове поле для зберігання часу витягування карти
             )
             """
         )
@@ -53,6 +54,20 @@ async def init_db():
         )
 
         await db.commit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ======================
