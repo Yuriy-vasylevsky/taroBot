@@ -27,12 +27,12 @@ def build_main_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
     rows.extend(
         [
             # [KeyboardButton(text="🃏 Карта дня")],
-            [KeyboardButton(text="⚡ Поповнити енергію")],
+            # [KeyboardButton(text="⚡ Поповнити енергію")],
             [KeyboardButton(text="🔮 Живий Таро-чат")],
             [KeyboardButton(text="📚 Популярні розклади")],
-            [
+            [   KeyboardButton(text="⚡ Поповнити енергію"),
                 KeyboardButton(
-                    text="🖼 Переглянути всі карти",
+                    text="🖼 Переглянути карти",
                     web_app=WebAppInfo(url=VIEW_ALL_CARDS_URL),
                 )
             ],

@@ -1,3 +1,6 @@
+
+
+
 import os
 import json
 import tempfile
@@ -9,7 +12,7 @@ from aiogram.types import FSInputFile, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from modules.menu import menu
+from modules.menu import menu, popular_menu
 from cards_data import TAROT_CARDS
 
 from openai import AsyncOpenAI
@@ -97,6 +100,37 @@ LOVE_LAYOUTS = {
         ],
     },
 }
+
+
+def build_no_energy_kb() -> types.InlineKeyboardMarkup:
+    """
+    Клавіатура, коли недостатньо енергії.
+    Кнопки інтегровані з energy_router.py:
+    - energy_topup - написати касиру
+    - energy_invite - запросити друзів
+    """
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="💛 Написати касиру",
+                    callback_data="energy_topup"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="👥 Запросити друзів",
+                    callback_data="energy_invite"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="🏠 Повернутись в меню",
+                    callback_data="back_to_main_menu"
+                )
+            ]
+        ]
+    )
 
 
 # ======================
@@ -313,39 +347,6 @@ async def love_choose_layout(callback: types.CallbackQuery, state: FSMContext):
 # ======================
 #   ІМ'Я / ПОЗНАЧЕННЯ ЛЮДИНИ
 # ======================
-# @love_taro.message(LoveDialog.waiting_for_target)
-# async def love_target(message: types.Message, state: FSMContext):
-#     target_name = (message.text or "").strip()
-#     if not target_name:
-#         await message.answer(
-#             "Будь ласка, напиши хоча б якось, як ти позначаєш цю людину 🙏\n"
-#             "Наприклад: «Олег», «колишня», «партнер», «дівчина з роботи»."
-#         )
-#         return
-
-#     await state.update_data(target_name=target_name)
-
-#     kb = types.ReplyKeyboardMarkup(
-#         resize_keyboard=True,
-#         keyboard=[
-#             [
-#                 types.KeyboardButton(
-#                     text="✨ Обрати 3 карти",
-#                     web_app=types.WebAppInfo(
-#                         url="https://yuriy-vasylevsky.github.io/tarodayweb"
-#                     ),
-#                 )
-#             ]
-#         ],
-#     )
-
-#     await message.answer(
-#         "🃏 Чудово. Тепер обери 3 карти через колоду нижче:", reply_markup=kb
-#     )
-
-#     await state.set_state(LoveDialog.waiting_for_cards)
-
-
 @love_taro.message(LoveDialog.waiting_for_target)
 async def love_target(message: types.Message, state: FSMContext):
     target_name = (message.text or "").strip()
@@ -384,6 +385,115 @@ async def love_target(message: types.Message, state: FSMContext):
     )
 
     await state.set_state(LoveDialog.waiting_for_cards)
+
+
+# ======================
+#   ОБМІН ЕНЕРГІЄЮ / НАЗАД
+# ======================
+@love_taro.callback_query(LoveDialog.waiting_for_cards)
+async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    msg = callback.message
+    data = callback.data
+
+    # 🔙 Повернення
+    if data == "love_back":
+        try:
+            await msg.delete()
+        except:
+            pass
+
+        from modules.menu import build_main_menu
+
+        kb = build_main_menu(user_id)
+
+        await callback.message.bot.send_message(
+            chat_id=msg.chat.id, text="🔙 Повертаю в головне меню.", reply_markup=kb
+        )
+        await state.clear()
+        await callback.answer()
+        return
+
+    # Не оплата? — ігнор
+    if data != "love_pay":
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+    # 1️⃣ списуємо енергію
+    ok, balance = await charge_energy(user_id, ENERGY_COST_LOVE)
+
+    if not ok:
+        current = balance
+        need = ENERGY_COST_LOVE
+        user = callback.from_user
+        
+        await msg.answer(
+            f"⚡ <b>Енергетичний баланс</b>\n\n"
+            f"👤 {user.full_name}\n"
+            f"✨ Баланс: <b>{current}</b> енергії\n\n"
+            f"❌ Для цього розкладу потрібно <b>{need}</b> енергії\n"
+            f"💫 Не вистачає: <b>{need - current}</b> ✨\n\n"
+            f"Обери дію:",
+            parse_mode="HTML",
+            reply_markup=build_no_energy_kb()
+        )
+        
+        # Очищаємо стан після показу помилки
+        await state.clear()
+        return
+
+    # 2️⃣ видаляємо старе повідомлення
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # 3️⃣ анімація
+    anim = await callback.message.bot.send_message(
+        msg.chat.id, "⚡ Обмінюємося енергією…"
+    )
+    try:
+        for i in range(4):
+            dots = "✨" * (i + 1)
+            await anim.edit_text(f"⚡ Обмінюємося енергією… {dots}")
+            await asyncio.sleep(0.5)
+    except:
+        pass
+
+    try:
+        await anim.delete()
+    except:
+        pass
+
+    # 4️⃣ успішно
+    await callback.message.bot.send_message(
+        msg.chat.id,
+        f"❤️ Енергія прийнята.\nВаш баланс: <b>{balance}</b> ✨",
+        parse_mode="HTML",
+    )
+
+    # 5️⃣ WebApp після оплати
+    kb = types.ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [
+                types.KeyboardButton(
+                    text="✨ Обрати 3 карти",
+                    web_app=types.WebAppInfo(
+                        url="https://yuriy-vasylevsky.github.io/tarodayweb"
+                    ),
+                )
+            ]
+        ],
+    )
+
+    await callback.message.bot.send_message(
+        msg.chat.id,
+        "🃏 Тепер оберіть 3 карти:",
+        reply_markup=kb,
+    )
 
 
 # ======================
@@ -500,96 +610,20 @@ async def love_cards(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-@love_taro.callback_query(LoveDialog.waiting_for_cards)
-async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    msg = callback.message
-    data = callback.data
+# ======================
+#   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
+# ======================
+# ПРИМІТКА: Обробники для "energy_topup" та "energy_invite" 
+# знаходяться в energy_router.py і не потребують дублювання тут
 
-    # 🔙 Повернення
-    if data == "love_back":
-        try:
-            await msg.delete()
-        except:
-            pass
-
-        from modules.menu import build_main_menu
-
-        kb = build_main_menu(user_id)
-
-        await callback.message.bot.send_message(
-            chat_id=msg.chat.id, text="🔙 Повертаю в головне меню.", reply_markup=kb
-        )
-        await state.clear()
-        await callback.answer()
-        return
-
-    # Не оплата? — ігнор
-    if data != "love_pay":
-        await callback.answer()
-        return
-
-    # 1️⃣ списуємо енергію
-    ok, balance = await charge_energy(user_id, ENERGY_COST_LOVE)
-
-    if not ok:
-        await msg.answer(
-            "🔋 Недостатньо енергії.\n"
-            f"Потрібно: <b>{ENERGY_COST_LOVE}</b> ✨\n"
-            f"У вас: <b>{balance}</b> ✨",
-            parse_mode="HTML",
-        )
-        return
-
-    # 2️⃣ видаляємо старе повідомлення
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    # 3️⃣ анімація
-    anim = await callback.message.bot.send_message(
-        msg.chat.id, "⚡ Обмінюємося енергією…"
+@love_taro.callback_query(F.data == "back_to_main_menu")
+async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Повернення в головне меню
+    """
+    await callback.message.answer(
+        "🏠 Повертаємось в головне меню",
+        reply_markup=popular_menu
     )
-    try:
-        for i in range(4):
-            dots = "✨" * (i + 1)
-            await anim.edit_text(f"⚡ Обмінюємося енергією… {dots}")
-            await asyncio.sleep(0.5)
-    except:
-        pass
-
-    try:
-        await anim.delete()
-    except:
-        pass
-
-    # 4️⃣ успішно
-    await callback.message.bot.send_message(
-        msg.chat.id,
-        f"❤️ Енергія прийнята.\nВаш баланс: <b>{balance}</b> ✨",
-        parse_mode="HTML",
-    )
-
-    # 5️⃣ WebApp після оплати
-    kb = types.ReplyKeyboardMarkup(
-        resize_keyboard=True,
-        keyboard=[
-            [
-                types.KeyboardButton(
-                    text="✨ Обрати 3 карти",
-                    web_app=types.WebAppInfo(
-                        url="https://yuriy-vasylevsky.github.io/tarodayweb"
-                    ),
-                )
-            ]
-        ],
-    )
-
-    await callback.message.bot.send_message(
-        msg.chat.id,
-        "🃏 Тепер оберіть 3 карти:",
-        reply_markup=kb,
-    )
-
     await callback.answer()
+    await state.clear()

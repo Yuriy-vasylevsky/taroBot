@@ -1,4 +1,3 @@
-
 import os
 import re
 import json
@@ -51,22 +50,22 @@ client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 # ======================
 # SETTINGS
 # ======================
-ENERGY_COST_PER_READING = 2          # списується тільки за розклад / уточнення (1 карта)
+ENERGY_COST_PER_READING = 2  # списується тільки за розклад / уточнення (1 карта)
 BACKGROUND_PATH = "background.png"
 BACKGROUND_PATH10 = "bg.png"
 EXIT_TEXT = "⬅️ Завершити бесіду"
-
+WELCOME_IMAGE = "assets/1.png"
 # Clarify throttling (щоб бот рідко уточнював і частіше робив розклади)
-CLARIFY_COOLDOWN_SECONDS = 15 * 60   # не частіше ніж раз на 15 хв
-CLARIFY_MIN_TEXT_LEN = 18            # якщо дуже коротко і без теми — тоді можна уточнити
+CLARIFY_COOLDOWN_SECONDS = 15 * 60  # не частіше ніж раз на 15 хв
+CLARIFY_MIN_TEXT_LEN = 18  # якщо дуже коротко і без теми — тоді можна уточнити
 
 # Cleanup / memory hygiene
-SESSION_TTL_SECONDS = 6 * 60 * 60     # 6 годин без активності -> чистимо дані юзера
-CLEANUP_PROBABILITY = 0.06            # ~6% шанс запуску чистки на повідомлення (дешево)
+SESSION_TTL_SECONDS = 6 * 60 * 60  # 6 годин без активності -> чистимо дані юзера
+CLEANUP_PROBABILITY = 0.06  # ~6% шанс запуску чистки на повідомлення (дешево)
 
 # OpenAI timeouts/retries
 OPENAI_TIMEOUT_SEC = 30
-OPENAI_RETRIES = 2                    # 1 + 2 ретраї = 3 спроби
+OPENAI_RETRIES = 2  # 1 + 2 ретраї = 3 спроби
 OPENAI_BACKOFF_BASE = 1.3
 
 # ======================
@@ -177,13 +176,21 @@ CLARIFIER_PROMPT = getattr(
 - ...
 - ...
 - ...
-"""
+""",
 )
 
-TAROT_SYSTEM_PROMPT = getattr(config, "TAROT_SYSTEM_PROMPT", DEFAULT_TAROT_SYSTEM_PROMPT)
-SPREAD_SELECTOR_PROMPT = getattr(config, "TAROT_SPREAD_SELECTOR_PROMPT", DEFAULT_SPREAD_SELECTOR_PROMPT)
-CHAT_MANAGER_PROMPT = getattr(config, "TAROT_CHAT_MANAGER_PROMPT", DEFAULT_CHAT_MANAGER_PROMPT)
-HUMAN_CHAT_PROMPT = getattr(config, "TAROT_HUMAN_CHAT_PROMPT", DEFAULT_HUMAN_CHAT_PROMPT)
+TAROT_SYSTEM_PROMPT = getattr(
+    config, "TAROT_SYSTEM_PROMPT", DEFAULT_TAROT_SYSTEM_PROMPT
+)
+SPREAD_SELECTOR_PROMPT = getattr(
+    config, "TAROT_SPREAD_SELECTOR_PROMPT", DEFAULT_SPREAD_SELECTOR_PROMPT
+)
+CHAT_MANAGER_PROMPT = getattr(
+    config, "TAROT_CHAT_MANAGER_PROMPT", DEFAULT_CHAT_MANAGER_PROMPT
+)
+HUMAN_CHAT_PROMPT = getattr(
+    config, "TAROT_HUMAN_CHAT_PROMPT", DEFAULT_HUMAN_CHAT_PROMPT
+)
 
 # ================== UI (HELP) ==================
 HELP_BTN_TEXT = "ℹ️ Як користуватись"
@@ -203,26 +210,42 @@ def help_back_inline_kb():
 
 
 def dialog_kb():
-    return ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[[KeyboardButton(text=EXIT_TEXT)]])
+    return ReplyKeyboardMarkup(
+        resize_keyboard=True, keyboard=[[KeyboardButton(text=EXIT_TEXT)]]
+    )
 
 
 def build_welcome_text() -> str:
-    return "✨ Привіт! Я поруч ❤️\nПиши як у звичайному чаті — підтримаю, а коли треба, зроблю розклад."
+    return (
+        "✨ <b>Вітаю в Живому Таро-чаті!</b>\n\n"
+        "Я — твій особистий таролог-наставник 🔮\n\n"
+        # "💬 Пиши як у звичайному чаті — а я зроблю розклад і дам детальне поснення для твоєї ситуації ❤️\n"
+
+    )
 
 
 def build_help_text() -> str:
     return (
         "ℹ️ <b>Як користуватись Живим Таро-чатом</b>\n\n"
-        "• Пиши як у звичайному чаті.\n"
-        "• Якщо потрібна ясність — зроблю розклад і поясню по позиціях.\n"
-        "• Якщо хочеш доповнити вже зроблений розклад — напиши: «доповни розклад / дотягни карту».\n\n"
-        "Розклади:\n"
-        "3 — коротко/швидко\n"
-        "4 — стосунки ❤️\n"
-        "5 — гроші/робота/вибір/переїзд 💼💰🧭\n"
-        "10 — глибоко/криза/комплексно 🔮\n\n"
-        f"⚡ Списується тільки за розклад або уточнення (1 карта): <b>{ENERGY_COST_PER_READING}</b> енергії."
+        "<b>🗣 Спілкування:</b>\n"
+        "• Пиши природно, як другу\n"
+        "• Розкажи про ситуацію або поділись тим, що турбує\n"
+        "• Можеш просто поспілкуватись — я підтримаю\n\n"
+        "<b>🔮 Розклади:</b>\n"
+        "Коли потрібна ясність, я автоматично зроблю розклад:\n"
+        "• <b>3 карти</b> — швидка відповідь на питання\n"
+        "• <b>4 карти</b> — стосунки, почуття ❤️\n"
+        "• <b>5 карт</b> — робота, гроші, вибір 💼💰\n"
+        "• <b>10 карт</b> — глибокий аналіз складної ситуації 🌟\n\n"
+        "<b>💡 Ви можете обрати самостійно бажаний тип розкладу, просто вкажіть кількість карт у вашому питанні 💡</b>\n\n"
+
+
+        "<b>🃏 Уточнення:</b>\n"
+        "Після розкладу можеш попросити:\n"
+        "«Доповни розклад» / «Дотягни карту» / «Поясни детальніше»\n\n"
+        f"⚡ <b>Вартість:</b> {ENERGY_COST_PER_READING} енергії за розклад або уточнення"
     )
+
 
 # ================== SESSION STATE (in-memory) ==================
 # ⚠️ Для продакшна краще Redis/DB, але зараз тримаємо в пам’яті + TTL-cleanup
@@ -254,7 +277,9 @@ def _maybe_cleanup_sessions():
     if random.random() > CLEANUP_PROBABILITY:
         return
     now = time.monotonic()
-    stale = [uid for uid, ts in user_last_seen.items() if (now - ts) > SESSION_TTL_SECONDS]
+    stale = [
+        uid for uid, ts in user_last_seen.items() if (now - ts) > SESSION_TTL_SECONDS
+    ]
     for uid in stale:
         user_last_seen.pop(uid, None)
         chat_histories.pop(uid, None)
@@ -285,31 +310,84 @@ def short_context(user_id: int) -> str:
         lines.append(f"{role}: {m['content']}")
     return "\n".join(lines).strip()
 
+
 # ================== TEXT INTENT HELPERS ==================
 SMALLTALK_SET = {
-    "дякую", "дякс", "спасибі", "мерсі",
-    "ок", "окей", "добре", "ясно", "зрозуміло", "супер", "круто", "клас", "топ",
-    "ага", "угу",
-    "👍", "❤️", "🙏", "✅",
+    "дякую",
+    "дякс",
+    "спасибі",
+    "мерсі",
+    "ок",
+    "окей",
+    "добре",
+    "ясно",
+    "зрозуміло",
+    "супер",
+    "круто",
+    "клас",
+    "топ",
+    "ага",
+    "угу",
+    "👍",
+    "❤️",
+    "🙏",
+    "✅",
 }
-ONLY_EMOJI_RE = re.compile(r"^[\s\.\,\!\?\-…:;()\[\]{}\"'«»🙂😉😊😀😅😂🤣😍❤️💔👍🙏💛✨🔥💯✅]+$")
+ONLY_EMOJI_RE = re.compile(
+    r"^[\s\.\,\!\?\-…:;()\[\]{}\"'«»🙂😉😊😀😅😂🤣😍❤️💔👍🙏💛✨🔥💯✅]+$"
+)
 
 SHORT_BUT_VALID_TOPICS = {
-    "гроші", "робота", "любов", "екс", "вибір", "переїзд", "стосунки", "здоров'я", "здоров’я"
+    "гроші",
+    "робота",
+    "любов",
+    "екс",
+    "вибір",
+    "переїзд",
+    "стосунки",
+    "здоров'я",
+    "здоров’я",
 }
 
-VAGUE_WORDS = {"підкажи", "порада", "розклад", "скажеш", "допоможи", "поясни", "підкажіть"}
+VAGUE_WORDS = {
+    "підкажи",
+    "порада",
+    "розклад",
+    "скажеш",
+    "допоможи",
+    "поясни",
+    "підкажіть",
+}
 
 SMALLTALK_Q_PHRASES = [
-    "як ти", "як справи", "що нового", "ти тут", "ти де", "хто ти",
-    "чим займаєшся", "що робиш", "як день", "як настрій"
+    "як ти",
+    "як справи",
+    "що нового",
+    "ти тут",
+    "ти де",
+    "хто ти",
+    "чим займаєшся",
+    "що робиш",
+    "як день",
+    "як настрій",
 ]
 
 FOLLOWUP_TRIGGERS = [
-    "доповни", "поглиб", "уточни", "детальніше", "поясни детальніше",
-    "дотягни", "дотягни карту", "додай карту", "ще карту", "ще одну карту",
-    "уточнення", "проясни",
-    "розшир", "розширене трактування", "розшифруй",
+    "доповни",
+    "поглиб",
+    "уточни",
+    "детальніше",
+    "поясни детальніше",
+    "дотягни",
+    "дотягни карту",
+    "додай карту",
+    "ще карту",
+    "ще одну карту",
+    "уточнення",
+    "проясни",
+    "розшир",
+    "розширене трактування",
+    "розшифруй",
 ]
 FOLLOWUP_RE = re.compile(
     r"(доповн|поглиб|уточн|детальніш|проясн|дотягн|додай|ще\s+карт|ще\s+одн|розшир|розшифруй)",
@@ -333,10 +411,30 @@ def has_topic_markers(text: str) -> bool:
     if rule_based_amount(t) is not None:
         return True
     markers = [
-        "він", "вона", "ми", "партнер", "чоловік", "дружина", "колишн", "екс",
-        "робот", "грош", "борг", "дохід", "кар'єр", "карʼєр",
-        "переїзд", "місто", "країна",
-        "вибір", "рішення", "варто", "коли", "чи буде", "що робити", "як бути"
+        "він",
+        "вона",
+        "ми",
+        "партнер",
+        "чоловік",
+        "дружина",
+        "колишн",
+        "екс",
+        "робот",
+        "грош",
+        "борг",
+        "дохід",
+        "кар'єр",
+        "карʼєр",
+        "переїзд",
+        "місто",
+        "країна",
+        "вибір",
+        "рішення",
+        "варто",
+        "коли",
+        "чи буде",
+        "що робити",
+        "як бути",
     ]
     return any(m in t for m in markers)
 
@@ -356,9 +454,39 @@ def parse_explicit_amount(text: str) -> Optional[int]:
 def rule_based_amount(text: str) -> Optional[int]:
     t = normalize_text(text)
 
-    rel = ["стосун", "відносин", "взаємин", "кохан", "любов", "партнер", "екс", "колишн", "між нами"]
-    work_money = ["робот", "кар'єр", "карʼєр", "гроші", "дохід", "борг", "переїзд", "план", "вибір", "рішення"]
-    deep = ["криза", "тупик", "по колу", "детально", "глибок", "безвихід", "все одразу", "роками"]
+    rel = [
+        "стосун",
+        "відносин",
+        "взаємин",
+        "кохан",
+        "любов",
+        "партнер",
+        "екс",
+        "колишн",
+        "між нами",
+    ]
+    work_money = [
+        "робот",
+        "кар'єр",
+        "карʼєр",
+        "гроші",
+        "дохід",
+        "борг",
+        "переїзд",
+        "план",
+        "вибір",
+        "рішення",
+    ]
+    deep = [
+        "криза",
+        "тупик",
+        "по колу",
+        "детально",
+        "глибок",
+        "безвихід",
+        "все одразу",
+        "роками",
+    ]
 
     rel_score = sum(1 for w in rel if w in t)
     wm_score = sum(1 for w in work_money if w in t)
@@ -419,7 +547,19 @@ def wants_spread_now(text: str) -> bool:
     if not t:
         return False
 
-    if any(w in t for w in ["розклад", "таро", "карти", "карту", "прогноз", "подивись", "поглянь", "витягни"]):
+    if any(
+        w in t
+        for w in [
+            "розклад",
+            "таро",
+            "карти",
+            "карту",
+            "прогноз",
+            "подивись",
+            "поглянь",
+            "витягни",
+        ]
+    ):
         return True
 
     if parse_explicit_amount(t) is not None:
@@ -489,6 +629,7 @@ def smalltalk_reply() -> str:
     ]
     return random.choice(variants)
 
+
 # ================== OPENAI HELPERS ==================
 def _extract_json_object(raw: str) -> Optional[dict]:
     raw = (raw or "").strip()
@@ -538,11 +679,17 @@ async def _openai_create_with_retry(
             coro = client.chat.completions.create(**kwargs)
             return await asyncio.wait_for(coro, timeout=timeout)
 
-        except (asyncio.TimeoutError, RateLimitError, APIConnectionError, APITimeoutError, APIError) as e:
+        except (
+            asyncio.TimeoutError,
+            RateLimitError,
+            APIConnectionError,
+            APITimeoutError,
+            APIError,
+        ) as e:
             last_err = e if isinstance(e, Exception) else Exception(str(e))
             if attempt >= retries:
                 break
-            sleep_s = (OPENAI_BACKOFF_BASE ** attempt) + random.random() * 0.35
+            sleep_s = (OPENAI_BACKOFF_BASE**attempt) + random.random() * 0.35
             await asyncio.sleep(sleep_s)
 
         except Exception as e:
@@ -572,7 +719,9 @@ def _limit_questions(text: str, max_q: int = 1) -> str:
     return "".join(out)
 
 
-async def generate_human_chat_reply(user_id: int, user_text: str, hint: str = "") -> str:
+async def generate_human_chat_reply(
+    user_id: int, user_text: str, hint: str = ""
+) -> str:
     payload = (
         f"Короткий контекст (останні повідомлення):\n{short_context(user_id)}\n\n"
         f"Повідомлення користувача:\n{user_text}\n"
@@ -643,6 +792,7 @@ async def manager_decide(user_id: int, user_text: str) -> Dict[str, Any]:
         logger.exception("manager_decide failed")
         return {"mode": "chat", "reply": "", "amount": None}
 
+
 # ================== SPREAD SELECTION ==================
 def choose_spread_layout(amount: int, user_text: str) -> Tuple[str, List[str]]:
     t = normalize_text(user_text)
@@ -685,14 +835,41 @@ def choose_spread_layout(amount: int, user_text: str) -> Tuple[str, List[str]]:
             ],
         )
 
-    future_words = ["коли", "чи буде", "буде", "в майбутньому", "прогноз", "через", "наступ"]
-    action_words = ["що робити", "як бути", "як діяти", "вибір", "виріш", "порада", "план", "крок", "чи варто"]
+    future_words = [
+        "коли",
+        "чи буде",
+        "буде",
+        "в майбутньому",
+        "прогноз",
+        "через",
+        "наступ",
+    ]
+    action_words = [
+        "що робити",
+        "як бути",
+        "як діяти",
+        "вибір",
+        "виріш",
+        "порада",
+        "план",
+        "крок",
+        "чи варто",
+    ]
 
     if any(w in t for w in future_words):
-        return ("Три карти (3): Минуле—Теперішнє—Майбутнє", ["Минуле", "Теперішнє", "Майбутнє"])
+        return (
+            "Три карти (3): Минуле—Теперішнє—Майбутнє",
+            ["Минуле", "Теперішнє", "Майбутнє"],
+        )
     if any(w in t for w in action_words):
-        return ("Три карти (3): Допомагає—Заважає—Порада", ["Що допомагає", "Що заважає", "Порада / як діяти"])
-    return ("Три карти (3): Суть—Виклик—Порада", ["Суть ситуації", "Ключовий виклик", "Порада / напрям"])
+        return (
+            "Три карти (3): Допомагає—Заважає—Порада",
+            ["Що допомагає", "Що заважає", "Порада / як діяти"],
+        )
+    return (
+        "Три карти (3): Суть—Виклик—Порада",
+        ["Суть ситуації", "Ключовий виклик", "Порада / напрям"],
+    )
 
 
 async def choose_spread_via_gpt(user_text: str) -> Tuple[int, str, List[str]]:
@@ -741,6 +918,7 @@ async def choose_spread_via_gpt(user_text: str) -> Tuple[int, str, List[str]]:
         spread_name, positions = choose_spread_layout(amount, user_text)
         return amount, spread_name, positions
 
+
 # ================== CARDS ==================
 def draw_cards(amount: int) -> List[dict]:
     names = list(TAROT_CARDS.keys())
@@ -756,7 +934,9 @@ def draw_cards(amount: int) -> List[dict]:
     return result
 
 
-def build_cards_payload_ready(spread_name: str, positions: List[str], user_text: str, cards: List[dict]) -> str:
+def build_cards_payload_ready(
+    spread_name: str, positions: List[str], user_text: str, cards: List[dict]
+) -> str:
     amount = len(cards)
     pos_lines = "\n".join([f"{i}. {positions[i-1]}" for i in range(1, amount + 1)])
     cards_lines = "\n".join(
@@ -769,6 +949,7 @@ def build_cards_payload_ready(spread_name: str, positions: List[str], user_text:
         f"Витягнуті карти:\n{cards_lines}\n\n"
         f"Запит користувача (контекст): {user_text}"
     )
+
 
 # ================== OUTPUT SANITIZER ==================
 # Робимо м’яко: прибираємо тільки типові “службові” фрази, не з’їдаючи зміст.
@@ -793,6 +974,7 @@ def strip_bad_phrases(text: str) -> str:
             continue
         cleaned.append(ln)
     return "\n".join(cleaned).strip()
+
 
 # ================== IMAGE RENDER (CACHED, BYTES) ==================
 _BG_CACHE: Dict[str, Image.Image] = {}
@@ -890,13 +1072,25 @@ def _safe_remove(path: str):
     except Exception:
         pass
 
+
 # ================== SPINNER (optimized) ==================
-SPINNER_FRAMES = ["🔮 Дивлюсь уважно твої карти", "🔮 Роблю аналіз", "🔮 ретельно перевіряю", "🔮 Готую відповідь"]
-SPINNER_ANIM_PATH = "thinking.mp4"  
+SPINNER_FRAMES = [
+    "🔮 Дивлюсь уважно твої карти",
+    "🔮 Роблю аналіз",
+    "🔮 ретельно перевіряю",
+    "🔮 Готую відповідь",
+]
+SPINNER_ANIM_PATH = "thinking.mp4"
 
 
 class SpinnerHandle:
-    def __init__(self, anim_msg: types.Message, text_msg: types.Message, stop_event: asyncio.Event, task: asyncio.Task):
+    def __init__(
+        self,
+        anim_msg: types.Message,
+        text_msg: types.Message,
+        stop_event: asyncio.Event,
+        task: asyncio.Task,
+    ):
         self.anim_msg = anim_msg
         self.text_msg = text_msg
         self.stop_event = stop_event
@@ -906,60 +1100,71 @@ class SpinnerHandle:
         """Зупинка спінера та видалення повідомлень"""
         # 1. Зупиняємо анімацію тексту
         self.stop_event.set()
-        
+
         # 2. Чекаємо завершення таску
         try:
             await asyncio.wait_for(self.task, timeout=3.5)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             pass
-        
+
         # 3. Затримка для стабільності
         await asyncio.sleep(0.3)
-        
+
         # 4. Видаляємо текстове повідомлення (з retry)
         deleted_text = await self._safe_delete(self.text_msg, "text", retries=3)
-        
+
         # 5. Затримка перед видаленням анімації
         if deleted_text:
             await asyncio.sleep(0.4)
-        
+
         # 6. Видаляємо анімацію (з retry)
         await self._safe_delete(self.anim_msg, "animation", retries=3)
 
-    async def _safe_delete(self, msg: types.Message, msg_type: str, retries: int = 3) -> bool:
+    async def _safe_delete(
+        self, msg: types.Message, msg_type: str, retries: int = 3
+    ) -> bool:
         """
         Безпечне видалення повідомлення з retry та exponential backoff
-        
+
         Returns:
             True якщо видалення успішне, False якщо ні
         """
         for attempt in range(retries):
             try:
                 await msg.delete()
-                logger.debug(f"Successfully deleted {msg_type} message (attempt {attempt + 1})")
+                logger.debug(
+                    f"Successfully deleted {msg_type} message (attempt {attempt + 1})"
+                )
                 return True
-                
+
             except Exception as e:
                 error_msg = str(e).lower()
-                
+
                 # Якщо повідомлення вже видалене - це успіх
-                if "message to delete not found" in error_msg or "message can't be deleted" in error_msg:
+                if (
+                    "message to delete not found" in error_msg
+                    or "message can't be deleted" in error_msg
+                ):
                     logger.debug(f"{msg_type} message already deleted")
                     return True
-                
+
                 # Якщо остання спроба - логуємо помилку
                 if attempt >= retries - 1:
-                    logger.warning(f"Failed to delete {msg_type} message after {retries} attempts: {e}")
+                    logger.warning(
+                        f"Failed to delete {msg_type} message after {retries} attempts: {e}"
+                    )
                     return False
-                
+
                 # Exponential backoff
-                wait_time = 0.3 * (2 ** attempt)
+                wait_time = 0.3 * (2**attempt)
                 await asyncio.sleep(wait_time)
-        
+
         return False
 
 
-async def _run_spinner(text_msg: types.Message, stop: asyncio.Event, interval: float = 1.0):
+async def _run_spinner(
+    text_msg: types.Message, stop: asyncio.Event, interval: float = 1.0
+):
     """Анімація текстового спінера"""
     i = 0
     last_text = None
@@ -998,7 +1203,7 @@ async def _run_spinner(text_msg: types.Message, stop: asyncio.Event, interval: f
 async def start_spinner(message: types.Message) -> SpinnerHandle:
     """
     Запуск спінера з анімацією та текстом
-    
+
     Returns:
         SpinnerHandle для управління спінером
     """
@@ -1010,27 +1215,33 @@ async def start_spinner(message: types.Message) -> SpinnerHandle:
         logger.warning(f"Failed to send animation: {e}")
         # Fallback - просто текстове повідомлення
         anim_msg = await message.answer("🔮")
-    
+
     # 2. Відправляємо текстовий спінер
     text_msg = await message.answer(SPINNER_FRAMES[0])
-    
+
     # 3. Запускаємо анімацію тексту
     stop_event = asyncio.Event()
     task = asyncio.create_task(_run_spinner(text_msg, stop_event, interval=1.0))
-    
+
     return SpinnerHandle(
-        anim_msg=anim_msg,
-        text_msg=text_msg,
-        stop_event=stop_event,
-        task=task
+        anim_msg=anim_msg, text_msg=text_msg, stop_event=stop_event, task=task
     )
+
 
 # ================== ENERGY PANEL ==================
 def energy_panel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💛 Написати касиру", callback_data="energy_topup")],
-            [InlineKeyboardButton(text="👥 Запросити друзів", callback_data="energy_invite")],
+            [
+                InlineKeyboardButton(
+                    text="💛 Написати касиру", callback_data="energy_topup"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👥 Запросити друзів", callback_data="energy_invite"
+                )
+            ],
         ]
     )
 
@@ -1063,37 +1274,73 @@ async def refund_energy(user_id: int, cost: int):
     except Exception:
         pass
 
+
 # ================== FSM ==================
 class TarotChatFSM(StatesGroup):
     chatting = State()
+
 
 # ================== HELP CALLBACKS ==================
 @dialog_router.callback_query(F.data == "tarot_help_open")
 async def tarot_help_open(callback: types.CallbackQuery):
     await callback.answer()
     try:
-        await callback.message.edit_text(build_help_text(), reply_markup=help_back_inline_kb(), parse_mode="HTML")
+        await callback.message.edit_text(
+            build_help_text(), reply_markup=help_back_inline_kb(), parse_mode="HTML"
+        )
     except Exception:
-        await callback.message.answer(build_help_text(), reply_markup=help_back_inline_kb(), parse_mode="HTML")
+        await callback.message.answer(
+            build_help_text(), reply_markup=help_back_inline_kb(), parse_mode="HTML"
+        )
 
 
 @dialog_router.callback_query(F.data == "tarot_help_back")
 async def tarot_help_back(callback: types.CallbackQuery):
     await callback.answer()
     try:
-        await callback.message.edit_text(build_welcome_text(), reply_markup=help_welcome_inline_kb(), parse_mode="HTML")
+        await callback.message.edit_text(
+            build_welcome_text(),
+            reply_markup=help_welcome_inline_kb(),
+            parse_mode="HTML",
+        )
     except Exception:
-        await callback.message.answer(build_welcome_text(), reply_markup=help_welcome_inline_kb(), parse_mode="HTML")
+        await callback.message.answer(
+            build_welcome_text(),
+            reply_markup=help_welcome_inline_kb(),
+            parse_mode="HTML",
+        )
+
 
 # ================== START / EXIT ==================
+
 @dialog_router.message(F.text == "🔮 Живий Таро-чат")
+
 async def start_dialog(message: types.Message, state: FSMContext):
     await state.set_state(TarotChatFSM.chatting)
     user_id = message.from_user.id
     _touch_user(user_id)
     chat_histories[user_id] = []
-    await message.answer(build_welcome_text(), reply_markup=help_welcome_inline_kb(), parse_mode="HTML")
-    await message.answer("👇 Напиши, що хвилює", reply_markup=dialog_kb())
+
+    # Відправляємо привітання з фото
+    try:
+        await message.answer_photo(
+            photo=FSInputFile(WELCOME_IMAGE),
+            caption=build_welcome_text(),
+            reply_markup=help_welcome_inline_kb(),
+            parse_mode="HTML",
+        )
+    except FileNotFoundError:
+        # Fallback без фото
+        await message.answer(
+            build_welcome_text(),
+            reply_markup=help_welcome_inline_kb(),
+            parse_mode="HTML",
+        )
+
+    # Клавіатура для виходу
+    await message.answer(
+        "👇 Напиши, що хвилює, і я допоможу розібратись", reply_markup=dialog_kb()
+    )
 
 
 @dialog_router.message(F.text == EXIT_TEXT)
@@ -1105,8 +1352,11 @@ async def exit_dialog(message: types.Message, state: FSMContext):
     except Exception:
         pass
     kb = build_main_menu(user_id)
-    await message.bot.send_message(message.chat.id, "🔙 Повертаю в головне меню.", reply_markup=kb)
+    await message.bot.send_message(
+        message.chat.id, "🔙 Повертаю в головне меню.", reply_markup=kb
+    )
     await state.clear()
+
 
 # ================== MAIN FLOW DECISION ==================
 async def decide_flow(user_id: int, user_text: str) -> Dict[str, Any]:
@@ -1149,13 +1399,18 @@ async def decide_flow(user_id: int, user_text: str) -> Dict[str, Any]:
         if is_too_vague_for_spread(user_id, user_text) and can_clarify_now(user_id):
             return {"mode": "clarify", "reply": mgr.get("reply") or "", "amount": None}
         # інакше форсимо spread
-        return {"mode": "spread", "reply": "Зрозумів(ла). Не тягну час — зроблю розклад по тому, що ти написав(ла) 🔮", "amount": amount}
+        return {
+            "mode": "spread",
+            "reply": "Зрозумів(ла). Не тягну час — зроблю розклад по тому, що ти написав(ла) 🔮",
+            "amount": amount,
+        }
 
     if mode == "spread":
         return {"mode": "spread", "reply": mgr.get("reply") or "", "amount": amount}
 
     # default chat
     return {"mode": "chat", "reply": mgr.get("reply") or "", "amount": None}
+
 
 # ================== MAIN CHAT HANDLER ==================
 @dialog_router.message(TarotChatFSM.chatting)
@@ -1192,14 +1447,19 @@ async def chat(message: types.Message, state: FSMContext):
 
             spinner: Optional[SpinnerHandle] = None
             try:
-                await message.answer("Добре 🔎 Дотягую 1 уточнюючу карту і розширюю трактування…")
+                await message.answer(
+                    "Добре 🔎 Дотягую 1 уточнюючу карту і розширюю трактування…"
+                )
 
                 clar_card = draw_cards(1)[0]
                 arrow = "⬆️" if clar_card["upright"] else "⬇️"
 
                 # картинка в пам’яті (без tmp)
                 img_bytes = make_single_card_on_background_bytes(
-                    clar_card["image"], clar_card["upright"], BACKGROUND_PATH, label_text="Уточнення"
+                    clar_card["image"],
+                    clar_card["upright"],
+                    BACKGROUND_PATH,
+                    label_text="Уточнення",
                 )
                 await message.answer_photo(
                     photo=BufferedInputFile(img_bytes, filename="clarify.png"),
@@ -1241,14 +1501,18 @@ async def chat(message: types.Message, state: FSMContext):
                     "question": lr.get("question", ""),
                     "spread_name": lr.get("spread_name", ""),
                     "cards": lr.get("cards", []),
-                    "short": (lr.get("short", "") + "\n\n[Уточнення]\n" + final_reply)[:900],
+                    "short": (lr.get("short", "") + "\n\n[Уточнення]\n" + final_reply)[
+                        :900
+                    ],
                 }
                 return
 
             except Exception:
                 logger.exception("followup clarifier failed")
                 await refund_energy(user_id, ENERGY_COST_PER_READING)
-                await message.answer("⚠️ Не вдалося доповнити трактування. Спробуй ще раз.")
+                await message.answer(
+                    "⚠️ Не вдалося доповнити трактування. Спробуй ще раз."
+                )
                 return
             finally:
                 if spinner:
@@ -1275,7 +1539,10 @@ async def chat(message: types.Message, state: FSMContext):
 
         # CLARIFY режим — 1 коротке уточнення + cooldown
         if decision["mode"] == "clarify":
-            reply = decision.get("reply") or "Уточни, будь ласка, одну річ: що саме ти хочеш прояснити в цій ситуації?"
+            reply = (
+                decision.get("reply")
+                or "Уточни, будь ласка, одну річ: що саме ти хочеш прояснити в цій ситуації?"
+            )
             reply = _limit_questions(reply, max_q=1)
             await message.answer(reply)
             add_chat_message(user_id, "assistant", reply)
@@ -1318,7 +1585,9 @@ async def chat(message: types.Message, state: FSMContext):
                     amount = rb
                     spread_name, positions = choose_spread_layout(amount, user_text)
                 else:
-                    amount, spread_name, positions = await choose_spread_via_gpt(user_text)
+                    amount, spread_name, positions = await choose_spread_via_gpt(
+                        user_text
+                    )
             else:
                 amount = int(amount)
                 spread_name, positions = choose_spread_layout(amount, user_text)
@@ -1356,7 +1625,9 @@ async def chat(message: types.Message, state: FSMContext):
             )
 
             # GPT тлумачення (строго по витягнутих картах)
-            payload = build_cards_payload_ready(spread_name, positions, user_text, cards)
+            payload = build_cards_payload_ready(
+                spread_name, positions, user_text, cards
+            )
 
             spinner = await start_spinner(message)
 
@@ -1387,7 +1658,9 @@ async def chat(message: types.Message, state: FSMContext):
         except Exception:
             logger.exception("spread flow failed")
             await refund_energy(user_id, ENERGY_COST_PER_READING)
-            await message.answer("⚠️ Не вдалося зробити розклад/тлумачення. Спробуй ще раз.")
+            await message.answer(
+                "⚠️ Не вдалося зробити розклад/тлумачення. Спробуй ще раз."
+            )
             return
 
         finally:
