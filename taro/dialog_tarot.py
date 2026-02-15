@@ -10,7 +10,7 @@ from io import BytesIO
 from typing import List, Dict, Tuple, Optional, Any
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import ReplyKeyboardRemove
-from modules.energy_panel import open_energy_panel_here
+from modules.energy_panel import open_energy_panel_here, build_no_energy_kb
 
 from aiogram import Router, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -32,7 +32,7 @@ import config
 from cards_data import TAROT_CARDS
 from modules.menu import build_main_menu
 from modules.user_stats_db import get_energy, change_energy
-from modules.tarot_spread_image import combine_spread_image  # ✅ 3/4/5/10
+from modules.tarot_spread_image import combine_spread_image
 
 # ======================
 # LOGGING
@@ -223,7 +223,6 @@ def build_welcome_text() -> str:
         "✨ <b>Вітаю в Живому Таро-чаті!</b>\n\n"
         "Я — твій особистий таролог-наставник 🔮\n\n"
         # "💬 Пиши як у звичайному чаті — а я зроблю розклад і дам детальне поснення для твоєї ситуації ❤️\n"
-
     )
 
 
@@ -241,8 +240,6 @@ def build_help_text() -> str:
         "• <b>5 карт</b> — робота, гроші, вибір 💼💰\n"
         "• <b>10 карт</b> — глибокий аналіз складної ситуації 🌟\n\n"
         "<b>💡 Ви можете обрати самостійно бажаний тип розкладу, просто вкажіть кількість карт у вашому питанні 💡</b>\n\n"
-
-
         "<b>🃏 Уточнення:</b>\n"
         "Після розкладу можеш попросити:\n"
         "«Доповни розклад» / «Дотягни карту» / «Поясни детальніше»\n\n"
@@ -1233,6 +1230,7 @@ async def start_spinner(message: types.Message) -> SpinnerHandle:
 
 # ================== ENERGY PANEL ==================
 
+
 async def reserve_energy(user_id: int, cost: int) -> bool:
     # Завдяки per-user lock це стає достатньо безпечним для поточного MVP.
     current = await get_energy(user_id)
@@ -1287,8 +1285,8 @@ async def tarot_help_back(callback: types.CallbackQuery):
 
 # ================== START / EXIT ==================
 
-@dialog_router.message(F.text == "🔮 Живий Таро-чат")
 
+@dialog_router.message(F.text == "🔮 Живий Таро-чат")
 async def start_dialog(message: types.Message, state: FSMContext):
     await state.set_state(TarotChatFSM.chatting)
     user_id = message.from_user.id
@@ -1414,9 +1412,10 @@ async def chat(message: types.Message, state: FSMContext):
                     # f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
                     # f"У вас: <b>{current}</b> ✨",
                     parse_mode="HTML",
-                    reply_markup=kb,
+                    reply_markup=build_no_energy_kb(),
                 )
-                await open_energy_panel_here(message)
+                # await open_energy_panel_here(message)
+             
                 return
 
             spinner: Optional[SpinnerHandle] = None
@@ -1543,9 +1542,10 @@ async def chat(message: types.Message, state: FSMContext):
                 # f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
                 # f"У вас: <b>{current}</b> ✨",
                 parse_mode="HTML",
-                reply_markup=kb,
+                reply_markup=build_no_energy_kb(),
             )
-            await open_energy_panel_here(message)
+            # await open_energy_panel_here(message)
+            # build_no_energy_kb()
             return
 
         spinner = None

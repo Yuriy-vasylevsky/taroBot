@@ -4,7 +4,7 @@ import json
 import tempfile
 import asyncio
 from PIL import Image, ImageDraw, ImageFilter
-
+from modules.energy_panel import build_no_energy_kb
 from aiogram import Router, F, types
 from aiogram.types import FSInputFile, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
@@ -149,37 +149,6 @@ def build_back_to_layouts_kb() -> types.InlineKeyboardMarkup:
                 types.InlineKeyboardButton(
                     text="⬅️ Повернутись в меню розкладів",
                     callback_data="dialog3_back",
-                )
-            ]
-        ]
-    )
-
-
-def build_no_energy_kb() -> types.InlineKeyboardMarkup:
-    """
-    Клавіатура, коли недостатньо енергії.
-    Кнопки інтегровані з energy_router.py:
-    - energy_topup - написати касиру
-    - energy_invite - запросити друзів
-    """
-    return types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="💛 Написати касиру",
-                    callback_data="energy_topup"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="👥 Запросити друзів",
-                    callback_data="energy_invite"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="🏠 Повернутись в меню",
-                    callback_data="back_to_main_menu"
                 )
             ]
         ]
@@ -484,11 +453,12 @@ async def tarot_energy_callback(callback: types.CallbackQuery, state: FSMContext
         user = callback.from_user
         
         await msg.answer(
-            f"⚡ <b>Енергетичний баланс</b>\n\n"
+            # f"⚡ <b>Енергетичний баланс</b>\n\n"
             # f"👤 {user.full_name}\n"
-            f"✨ Баланс: <b>{current}</b> енергії\n\n"
+            # f"✨ Баланс: <b>{current}</b> енергії\n\n"
             # f"❌ Для цього розкладу потрібно <b>{need}</b> енергії\n"
-            f"💫 Не вистачає: <b>{need - current}</b> ✨\n\n"
+            # f"💫 Не вистачає: <b>{need - current}</b> ✨\n\n"
+            f"🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
             f"Обери дію:",
             parse_mode="HTML",
             reply_markup=build_no_energy_kb()

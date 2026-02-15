@@ -1,6 +1,4 @@
 
-
-
 import os
 import json
 import tempfile
@@ -13,6 +11,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from modules.menu import menu, popular_menu
+from modules.energy_panel import build_no_energy_kb
+from modules.user_stats_db import get_energy, change_energy
 from cards_data import TAROT_CARDS
 
 from openai import AsyncOpenAI
@@ -22,16 +22,14 @@ import config
 love_taro = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 
-from modules.user_stats_db import get_energy, change_energy
-
 ENERGY_COST_LOVE = 3  # ціна любовного розкладу
 
 
 async def charge_energy(user_id: int, cost: int):
     """
     Повертає:
-    (True, new_balance) — якщо енергії вистачає і списано
-    (False, current_balance) — якщо не вистачає
+    (True, new_balance) – якщо енергії вистачає і списано
+    (False, current_balance) – якщо не вистачає
     """
     current = await get_energy(user_id)
     if current < cost:
@@ -45,13 +43,13 @@ async def charge_energy(user_id: int, cost: int):
 #   SYSTEM PROMPT (ЛЮБОВ)
 # ======================
 SYSTEM_PROMPT_LOVE = """
-Ти — досвідчений таролог, який спеціалізується на темі кохання і стосунків.
+Ти – досвідчений таролог, який спеціалізується на темі кохання і стосунків.
 Говори м'яко, підтримуюче, але чесно.
 Поважай особисті кордони, не давай категоричних обіцянок ("назавжди", "гарантовано").
 Не лякай, не маніпулюй, не засуджуй. Підкреслюй цінність людини незалежно від партнера.
-Пиши українською або російською — так, як до тебе звертаються.
+Пиши українською або російською – так, як до тебе звертаються.
 
-Розклад робиться не "взагалі", а про конкретний зв'язок / людину, яку користувач позначає ім'ям або описом
+Розклад робиться не "взагалі", а про конкретний зв'язок – людину, яку користувач позначає ім'ям або описом
 (наприклад, "Олег", "чоловік", "колишня", "дівчина з роботи", "людина з побачень").
 
 Структура відповіді:
@@ -76,7 +74,7 @@ class LoveDialog(StatesGroup):
 # ======================
 LOVE_LAYOUTS = {
     "love_you_partner_between": {
-        "name": "Ти — Партнер — Що між вами",
+        "name": "Ти – Партнер – Що між вами",
         "positions": [
             "Ти зараз у цих стосунках",
             "Партнер зараз",
@@ -102,31 +100,44 @@ LOVE_LAYOUTS = {
 }
 
 
-def build_no_energy_kb() -> types.InlineKeyboardMarkup:
-    """
-    Клавіатура, коли недостатньо енергії.
-    Кнопки інтегровані з energy_router.py:
-    - energy_topup - написати касиру
-    - energy_invite - запросити друзів
-    """
+# ======================
+#   KB: МЕНЮ ЛЮБОВНИХ РОЗКЛАДІВ
+# ======================
+def build_love_layouts_kb() -> types.InlineKeyboardMarkup:
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="💛 Написати касиру",
-                    callback_data="energy_topup"
+                    text="💑 Ти – Партнер – Що між вами",
+                    callback_data="love_you_partner_between",
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text="👥 Запросити друзів",
-                    callback_data="energy_invite"
+                    text="🔮 Перспектива стосунків",
+                    callback_data="love_perspective",
                 )
             ],
             [
                 types.InlineKeyboardButton(
-                    text="🏠 Повернутись в меню",
-                    callback_data="back_to_main_menu"
+                    text="✨ Нові стосунки / Знайомство",
+                    callback_data="love_new",
+                )
+            ],
+        ]
+    )
+
+
+# ======================
+#   KB: НАЗАД (як у ask_taro)
+# ======================
+def build_back_to_love_layouts_kb() -> types.InlineKeyboardMarkup:
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="⬅️ Повернутись в меню розкладів",
+                    callback_data="love_back_to_layouts",
                 )
             ]
         ]
@@ -134,24 +145,35 @@ def build_no_energy_kb() -> types.InlineKeyboardMarkup:
 
 
 # ======================
+#   ХЕЛПЕРИ ДЛЯ ПОВІДОМЛЕНЬ ДІАЛОГУ
+# ======================
+async def remember_dialog_msg(state: FSMContext, message: types.Message):
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+    ids.append(message.message_id)
+    await state.update_data(dialog_msg_ids=ids)
+
+
+async def clear_dialog_messages(state: FSMContext, bot, chat_id: int):
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+
+    for mid in ids:
+        try:
+            await bot.delete_message(chat_id, mid)
+        except Exception:
+            pass
+
+    await state.update_data(dialog_msg_ids=[])
+
+
+# ======================
 #   КОМБІНУВАТИ 3 КАРТИ + ФОН
 # ======================
-def combine_three_cards_with_background(
-    paths, uprights, background_path: str = "background.png"
-) -> str:
-    """
-    Об'єднує 3 карти на PNG-фоні:
-    - трохи обрізає поля
-    - округлює кути
-    - додає 3D-тінь (ефект підняття)
-    - ідеально центрує на фоні
-    Повертає шлях до тимчасового PNG.
-    """
-
+def combine_three_cards_with_background(paths, uprights, background_path: str = "background.png") -> str:
     bg = Image.open(background_path).convert("RGBA")
     W, H = bg.size
 
-    # Обрізання ~1 мм (якщо є DPI)
     def crop_1mm(img: Image.Image) -> Image.Image:
         dpi = img.info.get("dpi", (300, 300))[0]
         mm_to_px = dpi / 25.4
@@ -161,7 +183,6 @@ def combine_three_cards_with_background(
             return img
         return img.crop((px, px, w - px, h - px))
 
-    # Заокруглення
     def round_corners(img: Image.Image, radius: int = 45) -> Image.Image:
         mask = Image.new("L", img.size, 0)
         draw = ImageDraw.Draw(mask)
@@ -170,7 +191,6 @@ def combine_three_cards_with_background(
         rounded.paste(img, (0, 0), mask)
         return rounded
 
-    # Тінь
     def add_3d_shadow(
         img: Image.Image,
         offset=(12, 18),
@@ -197,21 +217,17 @@ def combine_three_cards_with_background(
     for path, up in zip(paths, uprights):
         img = Image.open(path).convert("RGBA")
         img = crop_1mm(img)
-
         if not up:
             img = img.rotate(180, expand=True)
-
         img = round_corners(img)
         img = add_3d_shadow(img)
         cards.append(img)
 
-    # Масштаб
     card_w = int(W * 0.27)
     ratio = card_w / cards[0].size[0]
     card_h = int(cards[0].size[1] * ratio)
     cards = [c.resize((card_w, int(card_h * 1.05)), Image.LANCZOS) for c in cards]
 
-    # Центрування
     spacing = int(W * 0.03)
     total_width = card_w * 3 + spacing * 2
     start_x = int((W - total_width) / 2)
@@ -227,34 +243,22 @@ def combine_three_cards_with_background(
         bg.alpha_composite(img, (x, y))
 
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    bg.save(temp.name, "PNG", quality=95)
+    bg.save(temp.name, "PNG")
     return temp.name
 
 
 # ======================
 #   GPT: ЛЮБОВНЕ ТЛУМАЧЕННЯ
 # ======================
-async def interpret_love_cards_gpt(
-    target_name: str,
-    cards_display: str,
-    layout: dict,
-) -> str:
-    """
-    layout: {
-      "name": "...",
-      "positions": ["...", "...", "..."]
-    }
-    target_name — ім'я / опис людини, на яку спрямовано розклад
-    """
-
+async def interpret_love_cards_gpt(target_name: str, cards_display: str, layout: dict) -> str:
     target_name_clean = target_name.strip() or "ця людина / цей зв'язок"
 
     layout_block = (
         f"Обраний любовний розклад:\n{layout['name']}\n"
         f"Позиції карт:\n"
-        f"1 — {layout['positions'][0]}\n"
-        f"2 — {layout['positions'][1]}\n"
-        f"3 — {layout['positions'][2]}\n"
+        f"1 – {layout['positions'][0]}\n"
+        f"2 – {layout['positions'][1]}\n"
+        f"3 – {layout['positions'][2]}\n"
     )
 
     prompt = (
@@ -277,7 +281,6 @@ async def interpret_love_cards_gpt(
         max_tokens=900,
         temperature=0.9,
     )
-
     return resp.choices[0].message.content
 
 
@@ -286,39 +289,13 @@ async def interpret_love_cards_gpt(
 # ======================
 @love_taro.message(F.text == "❤️ Любов / Стосунки")
 async def love_dialog_start(message: types.Message, state: FSMContext):
-    """
-    1) показуємо інлайн-кнопки вибору типу любовного розкладу
-    """
-    kb = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="💑 Ти — Партнер — Що між вами",
-                    callback_data="love_you_partner_between",
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="🔮 Перспектива стосунків",
-                    callback_data="love_perspective",
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="✨ Нові стосунки / Знайомство",
-                    callback_data="love_new",
-                )
-            ],
-        ]
-    )
-
     await state.clear()
     await state.set_state(LoveDialog.choosing_layout)
-    await message.answer("❤️ Обери любовний розклад:", reply_markup=kb)
+    await message.answer("❤️ Обери любовний розклад:", reply_markup=build_love_layouts_kb())
 
 
 # ======================
-#   ОБРАННЯ ЛЮБОВНОГО РОЗКЛАДУ
+#   ОБРАННЯ ЛЮБОВНОГО РОЗКЛАДУ (з кнопкою назад)
 # ======================
 @love_taro.callback_query(LoveDialog.choosing_layout)
 async def love_choose_layout(callback: types.CallbackQuery, state: FSMContext):
@@ -329,18 +306,45 @@ async def love_choose_layout(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("Невідомий розклад.", show_alert=True)
         return
 
-    await state.update_data(layout=layout)
+    await state.update_data(layout=layout, dialog_msg_ids=[])
 
-    await callback.message.answer(
+    msg2 = await callback.message.answer(
         f"❤️ Обрано розклад: <b>{layout['name']}</b>\n\n"
         "Тепер напиши ім'я або коротке позначення людини, "
-        "на яку спрямований цей розклад (наприклад, «Олег», «чоловік», «колишня», "
-        "«дівчина з роботи», «людина з побачень»):",
+        "на яку спрямований цей розклад:",
         reply_markup=ReplyKeyboardRemove(),
         parse_mode="HTML",
     )
+    await remember_dialog_msg(state, msg2)
+
+    msg_back = await callback.message.answer(
+        "💬",
+        reply_markup=build_back_to_love_layouts_kb(),
+    )
+    await remember_dialog_msg(state, msg_back)
 
     await state.set_state(LoveDialog.waiting_for_target)
+    await callback.answer()
+
+
+# ======================
+#   НАЗАД ПІД ЧАС ВВОДУ ІМЕНІ (як у ask_taro)
+# ======================
+@love_taro.callback_query(LoveDialog.waiting_for_target, F.data == "love_back_to_layouts")
+async def love_back_from_target(callback: types.CallbackQuery, state: FSMContext):
+    await clear_dialog_messages(
+        state=state,
+        bot=callback.message.bot,
+        chat_id=callback.message.chat.id,
+    )
+
+    await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="📚 Повертаю в меню популярних розкладів.",
+        reply_markup=popular_menu,
+    )
+
+    await state.clear()
     await callback.answer()
 
 
@@ -357,9 +361,11 @@ async def love_target(message: types.Message, state: FSMContext):
         )
         return
 
+    # прибираємо службові повідомлення (прохання + кнопка назад)
+    await clear_dialog_messages(state=state, bot=message.bot, chat_id=message.chat.id)
+
     await state.update_data(target_name=target_name)
 
-    # Кнопки: оплатити або назад
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -370,7 +376,8 @@ async def love_target(message: types.Message, state: FSMContext):
             ],
             [
                 types.InlineKeyboardButton(
-                    text="⬅️ Повернутись у головне меню", callback_data="love_back"
+                    text="⬅️ Повернутись у головне меню",
+                    callback_data="love_back",
                 )
             ],
         ]
@@ -396,94 +403,74 @@ async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext)
     msg = callback.message
     data = callback.data
 
-    # 🔙 Повернення
     if data == "love_back":
         try:
             await msg.delete()
-        except:
+        except Exception:
             pass
 
         from modules.menu import build_main_menu
-
         kb = build_main_menu(user_id)
 
         await callback.message.bot.send_message(
-            chat_id=msg.chat.id, text="🔙 Повертаю в головне меню.", reply_markup=kb
+            chat_id=msg.chat.id,
+            text="🔙 Повертаю в головне меню.",
+            reply_markup=kb,
         )
         await state.clear()
         await callback.answer()
         return
 
-    # Не оплата? — ігнор
     if data != "love_pay":
         await callback.answer()
         return
 
     await callback.answer()
 
-    # 1️⃣ списуємо енергію
     ok, balance = await charge_energy(user_id, ENERGY_COST_LOVE)
 
     if not ok:
-        current = balance
-        need = ENERGY_COST_LOVE
-        user = callback.from_user
-        
         await msg.answer(
-            f"⚡ <b>Енергетичний баланс</b>\n\n"
-            f"👤 {user.full_name}\n"
-            f"✨ Баланс: <b>{current}</b> енергії\n\n"
-            f"❌ Для цього розкладу потрібно <b>{need}</b> енергії\n"
-            f"💫 Не вистачає: <b>{need - current}</b> ✨\n\n"
-            f"Обери дію:",
+            "🔋 <b>Енергія закінчилась</b> – щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            "Обери дію:",
             parse_mode="HTML",
-            reply_markup=build_no_energy_kb()
+            reply_markup=build_no_energy_kb(),
         )
-        
-        # Очищаємо стан після показу помилки
         await state.clear()
         return
 
-    # 2️⃣ видаляємо старе повідомлення
     try:
         await msg.delete()
-    except:
+    except Exception:
         pass
 
-    # 3️⃣ анімація
-    anim = await callback.message.bot.send_message(
-        msg.chat.id, "⚡ Обмінюємося енергією…"
-    )
+    anim = await callback.message.bot.send_message(msg.chat.id, "⚡ Обмінюємося енергією…")
     try:
         for i in range(4):
             dots = "✨" * (i + 1)
             await anim.edit_text(f"⚡ Обмінюємося енергією… {dots}")
             await asyncio.sleep(0.5)
-    except:
+    except Exception:
         pass
 
     try:
         await anim.delete()
-    except:
+    except Exception:
         pass
 
-    # 4️⃣ успішно
     await callback.message.bot.send_message(
         msg.chat.id,
         f"❤️ Енергія прийнята.\nВаш баланс: <b>{balance}</b> ✨",
         parse_mode="HTML",
     )
 
-    # 5️⃣ WebApp після оплати
     kb = types.ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [
                 types.KeyboardButton(
                     text="✨ Обрати 3 карти",
-                    web_app=types.WebAppInfo(
-                        url="https://yuriy-vasylevsky.github.io/tarodayweb"
-                    ),
+                    web_app=types.WebAppInfo(url="https://yuriy-vasylevsky.github.io/tarodayweb"),
                 )
             ]
         ],
@@ -517,9 +504,7 @@ async def love_cards(message: types.Message, state: FSMContext):
     target_name = state_data.get("target_name", "").strip() or "ця людина / цей зв'язок"
 
     if not layout:
-        await message.answer(
-            "Щось пішло не так. Спробуй почати любовний розклад заново."
-        )
+        await message.answer("Щось пішло не так. Спробуй почати любовний розклад заново.")
         await state.clear()
         return
 
@@ -528,8 +513,8 @@ async def love_cards(message: types.Message, state: FSMContext):
     cards_display: list[str] = []
 
     for i, card in enumerate(chosen, start=1):
-        eng = card["name"]
-        up = card["upright"]
+        eng = card.get("name")
+        up = card.get("upright", True)
 
         info = TAROT_CARDS.get(eng)
         if not info:
@@ -541,35 +526,32 @@ async def love_cards(message: types.Message, state: FSMContext):
         ua = info["ua_name"]
         arrow = "⬆️" if up else "⬇️"
         pos_name = layout["positions"][i - 1]
-        cards_display.append(f"{i}. {ua} {arrow} — {pos_name}")
+        cards_display.append(f"{i}. {ua} {arrow} – {pos_name}")
 
     if len(img_paths) != 3:
         await message.answer("Не вдалося завантажити всі три карти.")
         await state.clear()
         return
 
-    # 1️⃣ Комбінуємо 3 карти в одне зображення
     final_img = combine_three_cards_with_background(
         img_paths,
         uprights,
-        background_path="background.png",  # твій PNG-фон
+        background_path="background.png",
     )
 
     await message.answer_photo(
         FSInputFile(final_img),
-        caption=f"❤️ Любовний розклад: {layout['name']}\n" f"👤 Для: {target_name}",
+        caption=f"❤️ Любовний розклад: {layout['name']}\n👤 Для: {target_name}",
+        reply_markup=ReplyKeyboardRemove(),
     )
 
-    # 2️⃣ Анімація "тлумачення…"
     load_msg = await message.answer("🔮 Читаю твій любовний розклад…")
 
     async def anim():
         i = 0
         while True:
             try:
-                await load_msg.edit_text(
-                    "🔮 Читаю твій любовний розклад…\n" + "🔮" * ((i % 5) + 1)
-                )
+                await load_msg.edit_text("🔮 Читаю твій любовний розклад…\n" + "🔮" * ((i % 5) + 1))
             except Exception:
                 break
             i += 1
@@ -577,7 +559,6 @@ async def love_cards(message: types.Message, state: FSMContext):
 
     anim_task = asyncio.create_task(anim())
 
-    # 3️⃣ GPT-інтерпретація
     try:
         text = await interpret_love_cards_gpt(
             target_name,
@@ -591,7 +572,6 @@ async def love_cards(message: types.Message, state: FSMContext):
         except Exception:
             pass
 
-    # 4️⃣ Відповідь користувачу
     await message.answer(
         f"<b>👤 Для кого розклад:</b> {target_name}\n\n"
         f"<b>❤️ Любовний розклад:</b> {layout['name']}\n"
@@ -601,7 +581,6 @@ async def love_cards(message: types.Message, state: FSMContext):
         reply_markup=menu,
     )
 
-    # Чистимо тимчасовий файл
     try:
         os.remove(final_img)
     except Exception:
@@ -611,19 +590,13 @@ async def love_cards(message: types.Message, state: FSMContext):
 
 
 # ======================
-#   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
+#   КНОПКА "ПОВЕРНЕННЯ В МЕНЮ" (для build_no_energy_kb і подібних)
 # ======================
-# ПРИМІТКА: Обробники для "energy_topup" та "energy_invite" 
-# знаходяться в energy_router.py і не потребують дублювання тут
-
 @love_taro.callback_query(F.data == "back_to_main_menu")
 async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Повернення в головне меню
-    """
     await callback.message.answer(
         "🏠 Повертаємось в головне меню",
-        reply_markup=popular_menu
+        reply_markup=popular_menu,
     )
     await callback.answer()
     await state.clear()

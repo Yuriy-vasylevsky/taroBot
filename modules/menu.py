@@ -81,20 +81,6 @@ def admin_menu() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
-
-# ======================
-#   /start
-# ======================
-# @menu_router.message(CommandStart())
-# async def start_cmd(message: types.Message):
-#     kb = build_main_menu(message.from_user.id)
-
-#     await message.answer(
-#         "🔮 Вітаю у Таро-боті!\nОбери те, що тобі відгукується прямо зараз:",
-#         reply_markup=kb,
-#     )
-
-
 # ======================
 #   Вхід у популярні розклади
 # ======================

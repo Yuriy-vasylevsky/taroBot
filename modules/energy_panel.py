@@ -217,7 +217,6 @@
 from aiogram import Router, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-
 from modules.user_stats_db import get_energy
 
 energy_router = Router()
@@ -231,9 +230,41 @@ def energy_panel_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="💛 Написати касиру", callback_data="energy_topup")],
             [InlineKeyboardButton(text="👥 Запросити друзів", callback_data="energy_invite")],
-            [InlineKeyboardButton(text="🏠 Повернутись в меню", callback_data="energy_back_menu")],
+            # [InlineKeyboardButton(text="🏠 Повернутись в меню", callback_data="energy_back_menu")],
         ]
     )
+
+
+def build_no_energy_kb() -> types.InlineKeyboardMarkup:
+    """
+    Клавіатура, коли недостатньо енергії.
+    Кнопки інтегровані з energy_router.py:
+    - energy_topup - написати касиру
+    - energy_invite - запросити друзів
+    """
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="💛 Написати касиру",
+                    callback_data="energy_topup"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="👥 Запросити друзів",
+                    callback_data="energy_invite"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="🏠 Повернутись в меню",
+                    callback_data="back_to_main_menu"
+                )
+            ]
+        ]
+    )
+
 
 
 async def open_energy_panel_here(message: types.Message, *, title: str = "⚡ <b>Енергетичний баланс</b>"):
@@ -334,3 +365,5 @@ async def energy_back_menu(callback: types.CallbackQuery):
         text="🔙 Повертаємось в головне меню",
         reply_markup=kb,
     )
+
+
