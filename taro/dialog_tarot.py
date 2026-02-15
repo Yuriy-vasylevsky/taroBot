@@ -8,6 +8,9 @@ import time
 import logging
 from io import BytesIO
 from typing import List, Dict, Tuple, Optional, Any
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.types import ReplyKeyboardRemove
+from modules.energy_panel import open_energy_panel_here
 
 from aiogram import Router, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -1229,35 +1232,6 @@ async def start_spinner(message: types.Message) -> SpinnerHandle:
 
 
 # ================== ENERGY PANEL ==================
-def energy_panel_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="💛 Написати касиру", callback_data="energy_topup"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="👥 Запросити друзів", callback_data="energy_invite"
-                )
-            ],
-        ]
-    )
-
-
-async def open_energy_panel_here(message: types.Message):
-    user = message.from_user
-    energy = await get_energy(user.id)
-    await message.answer(
-        f"⚡ <b>Енергетичний баланс</b>\n\n"
-        f"👤 {user.full_name}\n"
-        f"✨ Баланс: <b>{energy}</b> енергії\n\n"
-        f"Обери дію:",
-        reply_markup=energy_panel_kb(),
-        parse_mode="HTML",
-    )
-
 
 async def reserve_energy(user_id: int, cost: int) -> bool:
     # Завдяки per-user lock це стає достатньо безпечним для поточного MVP.
@@ -1436,9 +1410,9 @@ async def chat(message: types.Message, state: FSMContext):
                 kb = build_main_menu(user_id)
                 current = await get_energy(user_id)
                 await message.answer(
-                    "🔋 <b>Енергія закінчилась</b> — щоб доповнити розклад, потрібно поповнити ⚡\n\n"
-                    f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
-                    f"У вас: <b>{current}</b> ✨",
+                    "🔋 <b>Енергія закінчилась</b> — щоб доповнити розклад, потрібно поповнити ⚡\n\n",
+                    # f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
+                    # f"У вас: <b>{current}</b> ✨",
                     parse_mode="HTML",
                     reply_markup=kb,
                 )
@@ -1565,9 +1539,9 @@ async def chat(message: types.Message, state: FSMContext):
             kb = build_main_menu(user_id)
             current = await get_energy(user_id)
             await message.answer(
-                "🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
-                f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
-                f"У вас: <b>{current}</b> ✨",
+                "🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n",
+                # f"Потрібно: <b>{ENERGY_COST_PER_READING}</b> ✨\n"
+                # f"У вас: <b>{current}</b> ✨",
                 parse_mode="HTML",
                 reply_markup=kb,
             )
