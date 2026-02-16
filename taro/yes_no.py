@@ -1,3 +1,365 @@
+# import os
+# import json
+# import tempfile
+# import asyncio
+
+# from aiogram import Router, F, types
+# from aiogram.types import FSInputFile, ReplyKeyboardRemove
+# from aiogram.fsm.context import FSMContext
+# from aiogram.fsm.state import State, StatesGroup
+
+# from PIL import Image, ImageDraw, ImageFilter
+
+# from modules.menu import menu, build_main_menu
+# from cards_data import TAROT_CARDS
+# from openai import AsyncOpenAI
+# import config
+
+# from modules.user_stats_db import get_energy, change_energy
+
+
+# yes_no = Router()
+# client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+
+# # ======================
+# #    НАЛАШТУВАННЯ ЕНЕРГІЇ
+# # ======================
+# ENERGY_COST_YESNO = 2  # Ціна розкладу Так/Ні
+
+
+# async def charge_energy(user_id: int, cost: int):
+#     """
+#     Повертає:
+#     (True, new_balance) — якщо списано
+#     (False, current_balance) — якщо не вистачає
+#     """
+#     current = await get_energy(user_id)
+#     if current < cost:
+#         return False, current
+
+#     await change_energy(user_id, -cost)
+#     return True, current - cost
+
+
+# # ======================
+# #    SYSTEM PROMPT
+# # ======================
+# SYSTEM_PROMPT_YESNO = """
+# Ти — досвідчений таролог.
+# Твоє завдання — дати чітку відповідь: Так / Скоріше так / Нейтрально / Скоріше ні / Ні.
+# Поясни це на основі трьох карт:
+
+# 1 — Основна енергія
+# 2 — Прихована причина
+# 3 — Ймовірний результат
+
+# Структура:
+# 1) 🔮 Підсумок
+# 2) ✨ Короткий розбір
+# 3) 🌙 Висновок
+# """
+
+
+# # ======================
+# #      FSM STATES
+# # ======================
+# class YesNoFSM(StatesGroup):
+#     waiting_for_question = State()
+#     waiting_for_energy = State()
+#     waiting_for_cards = State()
+
+
+# # ======================
+# #   КОМБІНАЦІЯ 3 КАРТ
+# # ======================
+# def combine_yesno_cards(paths, uprights, background="background.png"):
+
+#     bg = Image.open(background).convert("RGBA")
+#     W, H = bg.size
+
+#     def crop(img):
+#         dpi = img.info.get("dpi", (300, 300))[0]
+#         px = int((1 * dpi) / 25.4)
+#         return img.crop((px, px, img.size[0] - px, img.size[1] - px))
+
+#     def round_corners(img, radius=45):
+#         mask = Image.new("L", img.size, 0)
+#         draw = ImageDraw.Draw(mask)
+#         draw.rounded_rectangle([0, 0, img.size[0], img.size[1]], radius, fill=255)
+#         result = Image.new("RGBA", img.size)
+#         result.paste(img, mask=mask)
+#         return result
+
+#     def add_shadow(img, offset=(12, 18), blur=38):
+#         w, h = img.size
+#         shadow = Image.new("RGBA", (w, h), (0, 0, 0, 180))
+#         shadow = shadow.filter(ImageFilter.GaussianBlur(blur))
+
+#         layer = Image.new("RGBA", (w + offset[0], h + offset[1]), (0, 0, 0, 0))
+#         layer.paste(shadow, offset, shadow)
+#         layer.paste(img, (0, 0), img)
+#         return layer
+
+#     cards = []
+#     for p, u in zip(paths, uprights):
+#         img = Image.open(p).convert("RGBA")
+#         img = crop(img)
+#         if not u:
+#             img = img.rotate(180, expand=True)
+#         img = round_corners(img)
+#         img = add_shadow(img)
+#         cards.append(img)
+
+#     cw = int(W * 0.27)
+#     ratio = cw / cards[0].size[0]
+#     ch = int(cards[0].size[1] * ratio)
+#     cards = [c.resize((cw, int(ch * 1.05)), Image.LANCZOS) for c in cards]
+
+#     spacing = int(W * 0.03)
+#     total_width = cw * 3 + spacing * 2
+#     start_x = (W - total_width) // 2
+#     y = (H - ch) // 2
+
+#     for i, c in enumerate(cards):
+#         bg.alpha_composite(c, (start_x + i * (cw + spacing), y))
+
+#     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+#     bg.save(temp.name, "PNG")
+#     return temp.name
+
+
+# # ======================
+# #  GPT ТЛУМАЧЕННЯ YES/NO
+# # ======================
+# async def interpret_yes_no(question: str, cards_display: str):
+#     prompt = (
+#         f"{SYSTEM_PROMPT_YESNO}\n\n"
+#         f"Питання:\n{question}\n\n"
+#         f"Карти:\n{cards_display}\n\n"
+#         "Зроби чіткий висновок Так / Скоріше так / Нейтрально / Скоріше ні / Ні."
+#     )
+
+#     resp = await client.chat.completions.create(
+#         model="gpt-4.1-mini",
+#         messages=[
+#             {"role": "system", "content": SYSTEM_PROMPT_YESNO},
+#             {"role": "user", "content": prompt},
+#         ],
+#         max_tokens=600,
+#         temperature=0.9,
+#     )
+
+#     return resp.choices[0].message.content
+
+
+# # ======================
+# #       КНОПКА
+# # ======================
+# @yes_no.message(F.text == "✅ Так / Ні")
+# async def yesno_start(message: types.Message, state: FSMContext):
+#     await state.clear()
+#     await state.set_state(YesNoFSM.waiting_for_question)
+
+#     await message.answer(
+#         "❓ Напиши питання, на яке хочеш отримати відповідь Так / Ні:",
+#         reply_markup=ReplyKeyboardRemove()
+#     )
+
+
+# # ======================
+# #       ПИТАННЯ
+# # ======================
+# @yes_no.message(YesNoFSM.waiting_for_question)
+# async def yesno_question(message: types.Message, state: FSMContext):
+#     question = message.text.strip()
+#     await state.update_data(question=question)
+
+#     kb = types.InlineKeyboardMarkup(
+#         inline_keyboard=[
+#             [
+#                 types.InlineKeyboardButton(
+#                     text=f"⚡ Обмінятись енергією ({ENERGY_COST_YESNO}✨)",
+#                     callback_data="yesno_pay"
+#                 )
+#             ],
+#             [
+#                 types.InlineKeyboardButton(
+#                     text="⬅️ Повернутись в меню",
+#                     callback_data="yesno_back"
+#                 )
+#             ]
+#         ]
+#     )
+
+#     await message.answer(
+#         "✨ Для відповіді необхідно обмінятись енергією з колодою.",
+#         reply_markup=kb
+#     )
+
+#     await state.set_state(YesNoFSM.waiting_for_energy)
+
+
+# # ======================
+# #   ОПЛАТА / НАЗАД
+# # ======================
+# @yes_no.callback_query(YesNoFSM.waiting_for_energy)
+# async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext):
+#     data = callback.data
+#     user_id = callback.from_user.id
+#     msg = callback.message
+
+#     # 🔙 Назад
+#     if data == "yesno_back":
+#         try:
+#             await msg.delete()
+#         except:
+#             pass
+
+#         kb = build_main_menu(user_id)
+#         await callback.message.bot.send_message(
+#             msg.chat.id,
+#             "🔙 Повертаю в головне меню.",
+#             reply_markup=kb
+#         )
+
+#         await state.clear()
+#         await callback.answer()
+#         return
+
+#     # Не оплата
+#     if data != "yesno_pay":
+#         await callback.answer()
+#         return
+
+#     # 1) списання енергії
+#     ok, value = await charge_energy(user_id, ENERGY_COST_YESNO)
+#     if not ok:
+#         await msg.answer(
+#             f"🔋 Недостатньо енергії.\nПотрібно: {ENERGY_COST_YESNO}✨\nУ вас: {value}✨"
+#         )
+#         return
+
+#     # 2) видаляємо старе повідомлення
+#     try:
+#         await msg.delete()
+#     except:
+#         pass
+
+#     # 3) анімація
+#     anim = await callback.message.bot.send_message(
+#         msg.chat.id,
+#         "⚡ Обмінюємося енергією…"
+#     )
+#     try:
+#         for i in range(4):
+#             await anim.edit_text(f"⚡ Обмінюємося енергією… {'✨'*(i+1)}")
+#             await asyncio.sleep(0.5)
+#     except:
+#         pass
+
+#     try:
+#         await anim.delete()
+#     except:
+#         pass
+
+#     # 4) успішно
+#     await callback.message.bot.send_message(
+#         msg.chat.id,
+#         f"✨ Обмін успішний!\nВаша енергія: <b>{value}</b>✨",
+#         parse_mode="HTML"
+#     )
+
+#     # 5) показуємо WebApp
+#     kb = types.ReplyKeyboardMarkup(
+#         resize_keyboard=True,
+#         keyboard=[
+#             [
+#                 types.KeyboardButton(
+#                     text="✨ Обрати 3 карти",
+#                     web_app=types.WebAppInfo(
+#                         url="https://yuriy-vasylevsky.github.io/tarodayweb"
+#                     )
+#                 )
+#             ]
+#         ]
+#     )
+
+#     await callback.message.bot.send_message(
+#         msg.chat.id,
+#         "🃏 Тепер оберіть 3 карти:",
+#         reply_markup=kb
+#     )
+
+#     await state.set_state(YesNoFSM.waiting_for_cards)
+#     await callback.answer()
+
+
+# # ======================
+# #      КАРТИ З WEBAPP
+# # ======================
+# @yes_no.message(YesNoFSM.waiting_for_cards, F.web_app_data)
+# async def yesno_cards(message: types.Message, state: FSMContext):
+
+#     data = json.loads(message.web_app_data.data)
+#     if data.get("action") != "three_cards":
+#         return
+
+#     chosen = data["chosen"]
+#     question = (await state.get_data())["question"]
+
+#     img_paths = []
+#     uprights = []
+#     cards_display = []
+
+#     for i, card in enumerate(chosen, start=1):
+#         info = TAROT_CARDS.get(card["name"])
+#         img_paths.append(info["image"])
+#         uprights.append(card["upright"])
+#         arrow = "⬆️" if card["upright"] else "⬇️"
+#         cards_display.append(f"{i}. {info['ua_name']} {arrow}")
+
+#     final_img = combine_yesno_cards(img_paths, uprights)
+
+#     await message.answer_photo(
+#         FSInputFile(final_img),
+#         caption="🔮 Розклад: Так / Ні"
+#     )
+
+#     # loading anim
+#     load = await message.answer("🔮 Аналіз…")
+#     async def anim():
+#         i = 0
+#         while True:
+#             try:
+#                 await load.edit_text("🔮 Аналіз…\n" + "🔮"*((i%5)+1))
+#             except:
+#                 break
+#             i += 1
+#             await asyncio.sleep(0.25)
+
+#     task = asyncio.create_task(anim())
+
+#     try:
+#         interpretation = await interpret_yes_no(question, "\n".join(cards_display))
+#     finally:
+#         task.cancel()
+#         try: await load.delete()
+#         except: pass
+
+#     await message.answer(
+#         f"<b>❓ Питання:</b> {question}\n\n"
+#         f"{chr(10).join(cards_display)}\n\n"
+#         f"{interpretation}",
+#         parse_mode="HTML",
+#         reply_markup=menu
+#     )
+
+#     try: os.remove(final_img)
+#     except: pass
+
+#     await state.clear()
+
+
 import os
 import json
 import tempfile
@@ -10,7 +372,8 @@ from aiogram.fsm.state import State, StatesGroup
 
 from PIL import Image, ImageDraw, ImageFilter
 
-from modules.menu import menu, build_main_menu
+from modules.menu import menu, popular_menu
+from modules.energy_panel import build_no_energy_kb
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
@@ -39,6 +402,36 @@ async def charge_energy(user_id: int, cost: int):
 
     await change_energy(user_id, -cost)
     return True, current - cost
+
+
+# ======================
+#   ХЕЛПЕРИ ДЛЯ ПОВІДОМЛЕНЬ ДІАЛОГУ
+# ======================
+async def remember_dialog_msg(state: FSMContext, message: types.Message):
+    """
+    Запам'ятати message_id службового повідомлення діалогу.
+    """
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+    ids.append(message.message_id)
+    await state.update_data(dialog_msg_ids=ids)
+
+
+async def clear_dialog_messages(state: FSMContext, bot, chat_id: int):
+    """
+    Видалити всі службові повідомлення діалогу, які зберігаємо в dialog_msg_ids.
+    """
+    data = await state.get_data()
+    ids = data.get("dialog_msg_ids", [])
+
+    for mid in ids:
+        try:
+            await bot.delete_message(chat_id, mid)
+        except Exception:
+            pass
+
+    # щоб не намагатись чистити повторно
+    await state.update_data(dialog_msg_ids=[])
 
 
 # ======================
@@ -153,17 +546,63 @@ async def interpret_yes_no(question: str, cards_display: str):
 
 
 # ======================
-#       КНОПКА
+#   КНОПКА "НАЗАД" ДЛЯ YES/NO
+# ======================
+def build_back_yesno_kb() -> types.InlineKeyboardMarkup:
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="⬅️ Повернутись в меню розкладів",
+                    callback_data="yesno_back_start",
+                )
+            ]
+        ]
+    )
+
+
+# ======================
+#       КНОПКА СТАРТ
 # ======================
 @yes_no.message(F.text == "✅ Так / Ні")
 async def yesno_start(message: types.Message, state: FSMContext):
     await state.clear()
     await state.set_state(YesNoFSM.waiting_for_question)
 
-    await message.answer(
+    # 1) просимо ввести питання і прибираємо reply-клавіатуру
+    msg = await message.answer(
         "❓ Напиши питання, на яке хочеш отримати відповідь Так / Ні:",
         reply_markup=ReplyKeyboardRemove()
     )
+    await state.update_data(dialog_msg_ids=[msg.message_id])
+    
+    # 2) окремим повідомленням – інлайн "назад"
+    msg_back = await message.answer(
+        "💬",
+        reply_markup=build_back_yesno_kb(),
+    )
+    await remember_dialog_msg(state, msg_back)
+
+
+# ======================
+#   НАЗАД ПІД ЧАС ВВОДУ ПИТАННЯ
+# ======================
+@yes_no.callback_query(YesNoFSM.waiting_for_question, F.data == "yesno_back_start")
+async def yesno_back_from_question(callback: types.CallbackQuery, state: FSMContext):
+    await clear_dialog_messages(
+        state=state,
+        bot=callback.message.bot,
+        chat_id=callback.message.chat.id,
+    )
+
+    await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="📚 Повертаю в меню популярних розкладів.",
+        reply_markup=popular_menu,
+    )
+
+    await state.clear()
+    await callback.answer()
 
 
 # ======================
@@ -171,9 +610,15 @@ async def yesno_start(message: types.Message, state: FSMContext):
 # ======================
 @yes_no.message(YesNoFSM.waiting_for_question)
 async def yesno_question(message: types.Message, state: FSMContext):
-    question = message.text.strip()
+    question = (message.text or "").strip()
+    
+    if not question:
+        await message.answer("Будь ласка, сформулюй питання текстом.")
+        return
+    
     await state.update_data(question=question)
 
+    # Інлайн-кнопки "обмінятись енергією" + "назад в меню"
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -191,10 +636,11 @@ async def yesno_question(message: types.Message, state: FSMContext):
         ]
     )
 
-    await message.answer(
-        "✨ Для відповіді необхідно обмінятись енергією з колодою.",
+    msg = await message.answer(
+        "✨Сфокусуйтесь на своєму питанні та обміняйтесь енергією✨\n",
         reply_markup=kb
     )
+    await remember_dialog_msg(state, msg)
 
     await state.set_state(YesNoFSM.waiting_for_energy)
 
@@ -208,18 +654,18 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
     user_id = callback.from_user.id
     msg = callback.message
 
-    # 🔙 Назад
+    # 🔙 Назад в меню
     if data == "yesno_back":
-        try:
-            await msg.delete()
-        except:
-            pass
+        await clear_dialog_messages(
+            state=state,
+            bot=callback.message.bot,
+            chat_id=callback.message.chat.id,
+        )
 
-        kb = build_main_menu(user_id)
         await callback.message.bot.send_message(
-            msg.chat.id,
-            "🔙 Повертаю в головне меню.",
-            reply_markup=kb
+            chat_id=callback.message.chat.id,
+            text="📚 Повертаю в меню популярних розкладів.",
+            reply_markup=popular_menu,
         )
 
         await state.clear()
@@ -231,46 +677,69 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
         await callback.answer()
         return
 
-    # 1) списання енергії
+    await callback.answer()
+
+    # 1) Перевіряємо та списуємо енергію
     ok, value = await charge_energy(user_id, ENERGY_COST_YESNO)
+    
     if not ok:
+        current = value
+        need = ENERGY_COST_YESNO
+        user = callback.from_user
+        
         await msg.answer(
-            f"🔋 Недостатньо енергії.\nПотрібно: {ENERGY_COST_YESNO}✨\nУ вас: {value}✨"
+            f"🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            f"Обери дію:",
+            parse_mode="HTML",
+            reply_markup=build_no_energy_kb()
         )
+        
+        # Очищаємо стан після показу помилки
+        await state.clear()
         return
 
-    # 2) видаляємо старе повідомлення
+    # 2) видаляємо попереднє повідомлення з кнопками
     try:
         await msg.delete()
-    except:
+    except Exception:
         pass
 
-    # 3) анімація
-    anim = await callback.message.bot.send_message(
-        msg.chat.id,
-        "⚡ Обмінюємося енергією…"
+    # 3) Анімація "обміну енергією"
+    anim_msg = await callback.message.bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="⚡ Обмінюємося енергією з колодою… ✨",
     )
+
     try:
         for i in range(4):
-            await anim.edit_text(f"⚡ Обмінюємося енергією… {'✨'*(i+1)}")
-            await asyncio.sleep(0.5)
-    except:
+            bar = "✨" * (i + 1)
+            try:
+                await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+            except Exception:
+                break
+            await asyncio.sleep(0.3)
+    except Exception:
         pass
 
+    # 4) Ховаємо анімацію
     try:
-        await anim.delete()
-    except:
+        await anim_msg.delete()
+    except Exception:
         pass
 
-    # 4) успішно
+    # 5) Повідомлення "обмін успішний"
+    left = value
     await callback.message.bot.send_message(
-        msg.chat.id,
-        f"✨ Обмін успішний!\nВаша енергія: <b>{value}</b>✨",
-        parse_mode="HTML"
+        chat_id=callback.message.chat.id,
+        text=(
+            "⚡ Обмін енергією успішний!\n"
+            f"Ваша енергія: <b>{left}</b> ✨"
+        ),
+        parse_mode="HTML",
     )
 
-    # 5) показуємо WebApp
-    kb = types.ReplyKeyboardMarkup(
+    # 6) Показуємо кнопку WebApp для вибору 3 карт + кнопку повернутись в меню
+    kb_reply = types.ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [
@@ -278,20 +747,22 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
                     text="✨ Обрати 3 карти",
                     web_app=types.WebAppInfo(
                         url="https://yuriy-vasylevsky.github.io/tarodayweb"
-                    )
+                    ),
                 )
+            ],
+            [
+                types.KeyboardButton(text="🏠 Головне меню")
             ]
-        ]
+        ],
     )
 
     await callback.message.bot.send_message(
-        msg.chat.id,
-        "🃏 Тепер оберіть 3 карти:",
-        reply_markup=kb
+        chat_id=callback.message.chat.id,
+        text="🃏 Тепер оберіть 3 карти через колоду нижче:",
+        reply_markup=kb_reply,
     )
 
     await state.set_state(YesNoFSM.waiting_for_cards)
-    await callback.answer()
 
 
 # ======================
@@ -299,25 +770,67 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
 # ======================
 @yes_no.message(YesNoFSM.waiting_for_cards, F.web_app_data)
 async def yesno_cards(message: types.Message, state: FSMContext):
+    try:
+        data = json.loads(message.web_app_data.data)
+    except Exception:
+        await message.answer(
+            "Не вдалося прочитати дані з колоди. Спробуй ще раз.",
+            reply_markup=popular_menu
+        )
+        await state.clear()
+        return
 
-    data = json.loads(message.web_app_data.data)
     if data.get("action") != "three_cards":
         return
 
-    chosen = data["chosen"]
-    question = (await state.get_data())["question"]
+    chosen = data.get("chosen", [])
+    if len(chosen) != 3:
+        await message.answer(
+            "Для цього розкладу потрібно саме 3 карти.",
+            reply_markup=popular_menu
+        )
+        await state.clear()
+        return
+
+    state_data = await state.get_data()
+    question = state_data.get("question")
+
+    if not question:
+        await message.answer(
+            "Щось пішло не так. Спробуй почати розклад заново.",
+            reply_markup=popular_menu
+        )
+        await state.clear()
+        return
 
     img_paths = []
     uprights = []
     cards_display = []
 
     for i, card in enumerate(chosen, start=1):
-        info = TAROT_CARDS.get(card["name"])
-        img_paths.append(info["image"])
-        uprights.append(card["upright"])
-        arrow = "⬆️" if card["upright"] else "⬇️"
-        cards_display.append(f"{i}. {info['ua_name']} {arrow}")
+        eng = card.get("name")
+        up = bool(card.get("upright", True))
 
+        info = TAROT_CARDS.get(eng)
+        if not info:
+            continue
+
+        img_paths.append(info["image"])
+        uprights.append(up)
+
+        ua = info["ua_name"]
+        arrow = "⬆️" if up else "⬇️"
+        cards_display.append(f"{i}. {ua} {arrow}")
+
+    if len(img_paths) != 3:
+        await message.answer(
+            "Не вдалося завантажити всі три карти.",
+            reply_markup=popular_menu
+        )
+        await state.clear()
+        return
+
+    # 1) Комбінуємо 3 карти в одне зображення
     final_img = combine_yesno_cards(img_paths, uprights)
 
     await message.answer_photo(
@@ -325,36 +838,61 @@ async def yesno_cards(message: types.Message, state: FSMContext):
         caption="🔮 Розклад: Так / Ні"
     )
 
-    # loading anim
-    load = await message.answer("🔮 Аналіз…")
+    # 2) Анімація "тлумачення…"
+    load_msg = await message.answer("🔮 Тлумачення…")
+
     async def anim():
         i = 0
         while True:
             try:
-                await load.edit_text("🔮 Аналіз…\n" + "🔮"*((i%5)+1))
-            except:
+                await load_msg.edit_text("🔮 Тлумачення…\n" + "🔮" * ((i % 5) + 1))
+            except Exception:
                 break
             i += 1
             await asyncio.sleep(0.25)
 
-    task = asyncio.create_task(anim())
+    anim_task = asyncio.create_task(anim())
 
+    # 3) GPT інтерпретація
     try:
         interpretation = await interpret_yes_no(question, "\n".join(cards_display))
     finally:
-        task.cancel()
-        try: await load.delete()
-        except: pass
+        anim_task.cancel()
+        try:
+            await load_msg.delete()
+        except Exception:
+            pass
 
+    # 4) Відповідь користувачу
     await message.answer(
         f"<b>❓ Питання:</b> {question}\n\n"
+        f"<b>🔮 Розклад:</b> Так / Ні\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{interpretation}",
         parse_mode="HTML",
-        reply_markup=menu
+        reply_markup=popular_menu
     )
 
-    try: os.remove(final_img)
-    except: pass
+    # Чистимо тимчасовий файл
+    try:
+        os.remove(final_img)
+    except Exception:
+        pass
 
+    await state.clear()
+
+
+# ======================
+#   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
+# ======================
+@yes_no.callback_query(F.data == "back_to_main_menu")
+async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Повернення в головне меню
+    """
+    await callback.message.answer(
+        "🏠 Повертаємось в головне меню",
+        reply_markup=menu
+    )
+    await callback.answer()
     await state.clear()

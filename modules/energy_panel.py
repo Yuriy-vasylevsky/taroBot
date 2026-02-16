@@ -230,7 +230,7 @@ def energy_panel_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="💛 Написати касиру", callback_data="energy_topup")],
             [InlineKeyboardButton(text="👥 Запросити друзів", callback_data="energy_invite")],
-            # [InlineKeyboardButton(text="🏠 Повернутись в меню", callback_data="energy_back_menu")],
+            [InlineKeyboardButton(text="🏠 Повернутись в меню", callback_data="energy_back_menu")],
         ]
     )
 

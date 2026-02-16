@@ -58,7 +58,7 @@ popular_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="✅ Так / Ні"),
             KeyboardButton(text="➕➖ Плюси / Мінуси"),
         ],
-        [KeyboardButton(text="👥 Ти / Інша людина")],
+        # [KeyboardButton(text="👥 Ти / Інша людина")],
         [KeyboardButton(text="🍀 Підкова (7 карт)")],
         [KeyboardButton(text="🔙 Назад в меню")],
     ],

@@ -647,8 +647,7 @@ async def tarot_dialog_cards(message: types.Message, state: FSMContext):
 # ======================
 #   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
 # ======================
-# ПРИМІТКА: Обробники для "energy_topup" та "energy_invite" 
-# знаходяться в energy_router.py і не потребують дублювання тут
+
 
 @ask_taro.callback_query(F.data == "back_to_main_menu")
 async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
