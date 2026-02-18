@@ -1,9 +1,6 @@
 import aiosqlite
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-
-# DB_PATH = "tarot_users.db"
-
 import os
 import shutil
 
