@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from math import ceil
-
+import config
 from aiogram import Router, F, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -16,9 +16,9 @@ from aiogram.types import FSInputFile
 from modules.menu import build_main_menu
 
 admin_router = Router()
-ADMIN_ID = 752963390  # або бери з config.ADMIN_ID
+ADMIN_ID = config.ADMIN_ID  
 
-USERS_PER_PAGE = 5  # щоб точно не перелізти 4096 символів
+USERS_PER_PAGE = 5  
 
 
 # =============== ХЕЛПЕРИ ===============
