@@ -2,8 +2,26 @@ import aiosqlite
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-DB_PATH = "tarot_users.db"
+# DB_PATH = "tarot_users.db"
 
+import os
+import shutil
+
+# === PERSISTENT DATABASE ДЛЯ RAILWAY ===
+# База завжди буде в volume, щоб не затиралася при деплоях
+DB_PATH = "/data/tarot_users.db"
+
+# Автоматичне копіювання старої бази (один раз)
+if not os.path.exists(DB_PATH) and os.path.exists("/app/tarot_users.db"):
+    try:
+        os.makedirs("/data", exist_ok=True)
+        shutil.copy2("/app/tarot_users.db", DB_PATH)
+        print("✅ Стара база успішно перенесена в persistent volume (/data/tarot_users.db)")
+    except Exception as e:
+        print(f"⚠️ Не вдалося скопіювати базу: {e}")
+
+# Створюємо папку, якщо чомусь немає
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 # ======================
 #   ІНІЦІАЛІЗАЦІЯ БАЗИ
