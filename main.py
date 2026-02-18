@@ -26,13 +26,10 @@ from modules.energy_panel import energy_router
 from modules.start_handler import start_router
 from modules.admin_users import admin_users_router
 
-# ====================== WEBHOOK НАЛАШТУВАННЯ ======================
+# ====================== НАЛАШТУВАННЯ ======================
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")   # ← ОБОВ'ЯЗКОВО додай в Railway Variables!
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 8080))
-
-if not WEBHOOK_URL:
-    raise ValueError("❌ WEBHOOK_URL не встановлений! Додай його в Railway Variables")
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -42,7 +39,7 @@ bot = Bot(
 )
 dp = Dispatcher()
 
-# ====================== STARTUP / SHUTDOWN ======================
+# ====================== STARTUP & SHUTDOWN ======================
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(
         url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
@@ -52,21 +49,20 @@ async def on_startup(bot: Bot) -> None:
 
 async def on_shutdown(bot: Bot) -> None:
     await bot.delete_webhook(drop_pending_updates=True)
-    print("🛑 Webhook видалено при завершенні")
+    print("🛑 Webhook видалено")
 
-# ====================== ОСНОВНА ФУНКЦІЯ ======================
-async def main():
+# ====================== ПІДГОТОВКА БОТА ======================
+async def setup_bot() -> None:
     print("🔮 taroBot запускається...")
 
-    # 1. Ініціалізація бази даних
     await init_db()
 
-    # 2. Middleware
+    # Middleware
     logger_mw = ActivityLoggerMiddleware()
     dp.message.middleware(logger_mw)
     dp.callback_query.middleware(logger_mw)
 
-    # 3. Підключаємо всі роутери
+    # Роутери
     dp.include_router(menu_router)
     dp.include_router(card_router)
     dp.include_router(ask_taro)
@@ -81,11 +77,20 @@ async def main():
     dp.include_router(start_router)
     dp.include_router(admin_users_router)
 
-    # Реєструємо startup/shutdown
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # ====================== ЗАПУСК WEBHOOK ======================
+    print("✅ Усі роутери та middleware підключені")
+
+# ====================== ЗАПУСК ======================
+if __name__ == "__main__":
+    if not WEBHOOK_URL:
+        raise ValueError("❌ WEBHOOK_URL не встановлений в Variables Railway!")
+
+    # Асинхронна підготовка
+    asyncio.run(setup_bot())
+
+    # Запуск веб-сервера (без конфлікту loop)
     app = web.Application()
     app["bot"] = bot
 
@@ -99,7 +104,3 @@ async def main():
 
     print(f"🚀 Запуск веб-сервера на порту {PORT}...")
     web.run_app(app, host="0.0.0.0", port=PORT)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
