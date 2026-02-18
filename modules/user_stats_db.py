@@ -74,20 +74,6 @@ async def init_db():
         await db.commit()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ======================
 #   ДОПОМОЖНІ
 # ======================
@@ -117,19 +103,6 @@ async def _upsert_user(
             (user_id, username, full_name, now),
         )
         await db.commit()
-
-
-# async def _log_action(user_id: int, action: str):
-#     """
-#     Логує дію користувача.
-#     """
-#     async with aiosqlite.connect(DB_PATH) as db:
-#         await db.execute(
-#             "INSERT INTO user_actions (user_id, action) VALUES (?, ?)",
-#             (user_id, action),
-#         )
-#         await db.commit()
-
 
 async def _log_action(user_id: int, action: str):
     """

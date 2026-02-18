@@ -1,8 +1,5 @@
 from aiogram import Router, types, F
-from aiogram.filters import CommandStart
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
-
-from modules.animation import run_animation  # необов’язково
 import config
 
 menu_router = Router()
@@ -26,8 +23,6 @@ def build_main_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
     # Основні кнопки
     rows.extend(
         [
-            # [KeyboardButton(text="🃏 Карта дня")],
-            # [KeyboardButton(text="⚡ Поповнити енергію")],
             [KeyboardButton(text="🔮 Живий Таро-чат")],
             [KeyboardButton(text="📚 Популярні розклади")],
             [   KeyboardButton(text="⚡ Поповнити енергію"),
