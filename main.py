@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -31,7 +30,7 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 8080))
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logging.basicConfig(level=logging.INFO)
 
 bot = Bot(
     token=config.BOT_TOKEN,
@@ -51,10 +50,11 @@ async def on_shutdown(bot: Bot) -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     print("🛑 Webhook видалено")
 
-# ====================== ПІДГОТОВКА БОТА ======================
-async def setup_bot() -> None:
+# ====================== ОСНОВНА ФУНКЦІЯ ======================
+async def main():
     print("🔮 taroBot запускається...")
 
+    # Ініціалізація бази
     await init_db()
 
     # Middleware
@@ -80,27 +80,29 @@ async def setup_bot() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    print("✅ Усі роутери та middleware підключені")
-
-# ====================== ЗАПУСК ======================
-if __name__ == "__main__":
-    if not WEBHOOK_URL:
-        raise ValueError("❌ WEBHOOK_URL не встановлений в Variables Railway!")
-
-    # Асинхронна підготовка
-    asyncio.run(setup_bot())
-
-    # Запуск веб-сервера (без конфлікту loop)
+    # aiohttp application
     app = web.Application()
     app["bot"] = bot
 
-    webhook_handler = SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-    )
+    webhook_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
     webhook_handler.register(app, path=WEBHOOK_PATH)
 
     setup_application(app, dp, bot=bot)
 
-    print(f"🚀 Запуск веб-сервера на порту {PORT}...")
-    web.run_app(app, host="0.0.0.0", port=PORT)
+    # Правильний запуск для продакшену (без конфлікту loop)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+
+    await site.start()
+    print(f"🚀 Webhook сервер запущено на порту {PORT}")
+
+    # Тримаємо сервер живим
+    await asyncio.Event().wait()
+
+
+if __name__ == "__main__":
+    if not WEBHOOK_URL:
+        raise ValueError("❌ WEBHOOK_URL не встановлений в Variables Railway!")
+
+    asyncio.run(main())
