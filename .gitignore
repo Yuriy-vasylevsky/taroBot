@@ -1,54 +1,104 @@
-# --- Python ---
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyo
+*.pyc
 *.pyd
-*.pdb
-*.log
-*.sqlite3
-*.db
+*.pyz
+*.so
+*.egg-info/
+.eggs/
+*.egg
 
-# --- Virtual envs ---
+# Virtual environments
 .venv/
-env/
 venv/
+env/
 ENV/
+env.bak/
+venv.bak/
 
-# --- IDEs ---
+# Testing & coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.coverage.*
+.pytest_cache/
+tox/
+.nox/
+
+# IDEs & editors
 .vscode/
 .idea/
 *.swp
+*.swo
+*.swn
+*.sublime-*
+*.code-workspace
 
-# --- System files ---
+# Logs & databases
+*.log
+*.logs
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+tarot_users.db
+
+# OS generated files
 .DS_Store
 Thumbs.db
-tarot_users.db
-# --- Temporary / cache ---
-*.tmp
-*.bak
-*.old
+ehthumbs.db
+desktop.ini
+
+# Temporary / build / dist
 tmp/
 temp/
 cache/
+*.tmp
+*.bak
+*.old
 *.orig
-
-# --- Build / dist ---
+*.backup
 build/
 dist/
-*.egg-info/
-.eggs/
 *.spec
 
-# --- Images / assets (optional keep only via .gitattributes) ---
-# images/cards/*.jpg
+# Dependency directories (якщо використовуєте poetry/pipenv тощо)
+pip-wheel-metadata/
+*.whl
+*.tar.gz
 
-# --- Config / sensitive ---
-# config.py
+# Environment / secrets
 .env
 *.env
+.env.*
+# config.py               # якщо там є токени/ключі
+credentials.json
+service-account.json
 
-# --- n8n local data ---
+# n8n (якщо використовуєте)
 .n8n/
-*.json.backup
 *.n8n.backup
+*.json.backup
+
+# Documentation / exports
+*.md.bak
+*.pdf
+*.docx
+
+# Optional: якщо точно не хочете комітити зображення карт
+# (можна закомітити тільки через .gitattributes або LFS)
+# assets/cards/
+# images/
+# *.jpg
+# *.png
+# *.webp
+
+# Місцеві експерименти / нотатки
+playground/
+scratch/
+test_*.py

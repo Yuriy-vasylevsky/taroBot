@@ -52,6 +52,7 @@ async def main():
     print("🔮 taroBot запускається...")
 
     await init_db()
+    
 
     # Middleware
     logger_mw = ActivityLoggerMiddleware()
