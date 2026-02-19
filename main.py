@@ -61,7 +61,6 @@ async def main():
 
     # Роутери
     dp.include_router(menu_router)
-    dp.include_router(card_router)
     dp.include_router(ask_taro)
     dp.include_router(dialog_router)
     dp.include_router(yes_no)
@@ -72,9 +71,14 @@ async def main():
     dp.include_router(energy_router)
     dp.include_router(start_router)
     dp.include_router(admin_users_router)
-
+    dp.include_router(card_router)
     # dp.include_router(you_other)
     print("✅ Усі роутери підключені")
+
+
+
+
+
 
     # === ВИБІР РЕЖИМУ ===
     if WEBHOOK_URL:   # Railway / продакшен
@@ -101,4 +105,5 @@ async def main():
         await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    
     asyncio.run(main())

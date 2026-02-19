@@ -1,5 +1,6 @@
-BASE_PATH = "images/cards/"
-
+# BASE_PATH = "images/cards"
+from pathlib import Path as _P
+BASE_PATH = str(_P(__file__).parent / "images" / "cards") + "/"
 
 def img(name: str, pos: str) -> str:
     return f"{BASE_PATH}{name}_{pos}.jpg"
