@@ -23,7 +23,7 @@ ENV/
 # --- System files ---
 .DS_Store
 Thumbs.db
-
+tarot_users.db
 # --- Temporary / cache ---
 *.tmp
 *.bak
