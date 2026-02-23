@@ -388,9 +388,6 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
                         url="https://yuriy-vasylevsky.github.io/tarodayweb"
                     ),
                 )
-            ],
-            [
-                types.KeyboardButton(text="🏠 Головне меню")
             ]
         ],
     )
@@ -521,17 +518,17 @@ async def yesno_cards(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# ======================
-#   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
-# ======================
-@yes_no.callback_query(F.data == "back_to_main_menu")
-async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Повернення в головне меню
-    """
-    await callback.message.answer(
-        "🏠 Повертаємось в головне меню",
-        reply_markup=menu
-    )
-    await callback.answer()
-    await state.clear()
+# # ======================
+# #   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
+# # ======================
+# @yes_no.callback_query(F.data == "back_to_main_menu")
+# async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
+#     """
+#     Повернення в головне меню
+#     """
+#     await callback.message.answer(
+#         "🏠 Повертаємось в головне меню",
+#         reply_markup=menu
+#     )
+#     await callback.answer()
+#     await state.clear()

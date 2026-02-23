@@ -10,7 +10,7 @@ from aiogram.types import FSInputFile, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from modules.menu import menu, popular_menu
+from modules.menu import popular_menu
 from modules.energy_panel import build_no_energy_kb
 from modules.user_stats_db import get_energy, change_energy
 from cards_data import TAROT_CARDS
@@ -408,9 +408,7 @@ async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext)
             await msg.delete()
         except Exception:
             pass
-
-        from modules.menu import build_main_menu
-        kb = build_main_menu(user_id)
+        kb = popular_menu()
 
         await callback.message.bot.send_message(
             chat_id=msg.chat.id,
@@ -578,7 +576,7 @@ async def love_cards(message: types.Message, state: FSMContext):
         f"{chr(10).join(cards_display)}\n\n"
         f"{text}",
         parse_mode="HTML",
-        reply_markup=menu,
+        reply_markup=popular_menu,
     )
 
     try:
@@ -589,14 +587,14 @@ async def love_cards(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# ======================
-#   КНОПКА "ПОВЕРНЕННЯ В МЕНЮ" (для build_no_energy_kb і подібних)
-# ======================
-@love_taro.callback_query(F.data == "back_to_main_menu")
-async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(
-        "🏠 Повертаємось в головне меню",
-        reply_markup=popular_menu,
-    )
-    await callback.answer()
-    await state.clear()
+# # ======================
+# #   КНОПКА "ПОВЕРНЕННЯ В МЕНЮ" (для build_no_energy_kb і подібних)
+# # ======================
+# @love_taro.callback_query(F.data == "back_to_main_menu")
+# async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
+#     await callback.message.answer(
+#         "🏠 Повертаємось в головне меню",
+#         reply_markup=popular_menu,
+#     )
+#     await callback.answer()
+#     await state.clear()

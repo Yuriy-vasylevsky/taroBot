@@ -2,11 +2,12 @@ from aiogram import Router, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from modules.user_stats_db import get_energy
+import urllib.parse
 
 energy_router = Router()
 
-CASHIER_LINK = "https://t.me/your_username_here"   # заміни
-BOT_USERNAME = "minions_taro_bot"                  # заміни якщо інший
+CASHIER_LINK = "t.me/minion_taro_kassa"  
+BOT_USERNAME = "minions_taro_bot"                 
 
 
 def energy_panel_kb() -> InlineKeyboardMarkup:
@@ -43,12 +44,33 @@ def build_no_energy_kb() -> types.InlineKeyboardMarkup:
             [
                 types.InlineKeyboardButton(
                     text="🏠 Повернутись в меню",
-                    callback_data="back_to_main_menu"
+                    callback_data="energy_back_menu"
                 )
             ]
         ]
     )
 
+# _________________________________________________________________________________________________________
+def build_invite_friends_kb(link: str) -> InlineKeyboardMarkup:
+    """Клавіатура з кнопкою «Поділитися» — тепер текст буде красивий"""
+    
+    share_text = (
+        "🔮 Приєднуйся до мене в найкращому 🃏 Таро боті!\n\n"
+        "✨ +12 енергії в подарунок ✨\n"
+    )
+    
+    # Правильне кодування для Telegram
+    encoded_text = urllib.parse.quote(share_text)
+    
+    share_url = f"https://t.me/share/url?url={link}&text={encoded_text}"
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Поділитися посиланням", url=share_url)],
+            [InlineKeyboardButton(text="💛 Написати касиру", callback_data="energy_topup")],
+            [InlineKeyboardButton(text="🏠 Повернутись в меню", callback_data="energy_back_menu")],
+        ]
+    )
 
 
 async def open_energy_panel_here(message: types.Message, *, title: str = "⚡ <b>Енергетичний баланс</b>"):
@@ -87,6 +109,28 @@ async def _safe_edit_or_ignore(
         raise
 
 
+# @energy_router.callback_query(F.data == "energy_invite")
+# async def energy_invite(callback: types.CallbackQuery):
+#     await callback.answer()
+#     user_id = callback.from_user.id
+#     link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
+
+#     text = (
+#         "👥 <b>Запроси друзів</b>\n\n"
+#         "За кожного друга – ти отримаєш <b>12</b> ⚡ ✨\n\n"
+#         "Надішли цю персональну лінку:\n\n"
+#         f"{link}"
+#     )
+
+#     try:
+#         edited = await _safe_edit_or_ignore(callback.message, text, energy_panel_kb(), parse_mode="HTML")
+#         if not edited:
+#             return
+#     except TelegramBadRequest:
+#         await callback.message.answer(text, reply_markup=energy_panel_kb(), parse_mode="HTML")
+
+
+
 @energy_router.callback_query(F.data == "energy_invite")
 async def energy_invite(callback: types.CallbackQuery):
     await callback.answer()
@@ -96,16 +140,23 @@ async def energy_invite(callback: types.CallbackQuery):
     text = (
         "👥 <b>Запроси друзів</b>\n\n"
         "За кожного друга, який запустить бота – ти отримаєш <b>+12</b> енергії ✨\n\n"
-        "Надішли цю персональну лінку:\n\n"
-        f"{link}"
+        "Твоє персональне посилання:\n\n"
+        f"<code>{link}</code>\n\n"
+        "Щоб швидко поділитися 👇"
     )
 
+    kb = build_invite_friends_kb(link)
+
     try:
-        edited = await _safe_edit_or_ignore(callback.message, text, energy_panel_kb(), parse_mode="HTML")
+        edited = await _safe_edit_or_ignore(callback.message, text, kb, parse_mode="HTML")
         if not edited:
             return
     except TelegramBadRequest:
-        await callback.message.answer(text, reply_markup=energy_panel_kb(), parse_mode="HTML")
+        await callback.message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+
+
+
 
 
 @energy_router.callback_query(F.data == "energy_topup")
@@ -114,9 +165,12 @@ async def energy_topup(callback: types.CallbackQuery):
 
     text = (
         "💳 <b>Оплата через касира</b>\n\n"
-        "Щоб поповнити баланс енергії – напиши касиру в особисті повідомлення:\n\n"
+        "<b>⚡ 20 </b> - 50 грн \n"
+        "<b>⚡ 50 </b> - 150 грн \n"
+        "<b>⚡ 100 </b> - 200 грн \n\n"
+        # "Щоб поповнити баланс енергії – напиши касиру в особисті повідомлення:\n\n"
         f"{CASHIER_LINK}\n\n"
-        "Опиши, на скільки енергії хочеш поповнити баланс ✨"
+        # "Опиши, на скільки енергії хочеш поповнити баланс ✨"
     )
 
     try:

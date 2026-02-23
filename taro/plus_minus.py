@@ -425,9 +425,6 @@ async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMCon
                         url="https://yuriy-vasylevsky.github.io/web2cards"
                     ),
                 )
-            ],
-            [
-                types.KeyboardButton(text="🏠 Головне меню")
             ]
         ],
     )
@@ -569,17 +566,17 @@ async def plusminus_cards(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# ======================
-#   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
-# ======================
-@plus_minus.callback_query(F.data == "back_to_main_menu")
-async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Повернення в головне меню
-    """
-    await callback.message.answer(
-        "🏠 Повертаємось в головне меню",
-        reply_markup=menu
-    )
-    await callback.answer()
-    await state.clear()
+# # ======================
+# #   ОБРОБНИК КНОПКИ "ПОВЕРНЕННЯ В МЕНЮ"
+# # ======================
+# @plus_minus.callback_query(F.data == "back_to_main_menu")
+# async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
+#     """
+#     Повернення в головне меню
+#     """
+#     await callback.message.answer(
+#         "🏠 Повертаємось в головне меню",
+#         reply_markup=menu
+#     )
+#     await callback.answer()
+#     await state.clear()

@@ -37,7 +37,7 @@ bot = Bot(
     default=DefaultBotProperties(parse_mode=ParseMode.HTML),
 )
 dp = Dispatcher()
-
+ 
 # ====================== STARTUP & SHUTDOWN ======================
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(url=f"{WEBHOOK_URL}{WEBHOOK_PATH}", drop_pending_updates=True)
