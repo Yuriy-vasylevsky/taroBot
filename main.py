@@ -37,6 +37,8 @@ bot = Bot(
     default=DefaultBotProperties(parse_mode=ParseMode.HTML),
 )
 dp = Dispatcher()
+
+
  
 # ====================== STARTUP & SHUTDOWN ======================
 async def on_startup(bot: Bot) -> None:

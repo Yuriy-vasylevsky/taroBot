@@ -26,7 +26,7 @@ client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 # ======================
 #    НАЛАШТУВАННЯ ЕНЕРГІЇ
 # ======================
-ENERGY_COST_YESNO = 2  # Ціна розкладу Так/Ні
+ENERGY_COST_YESNO = 2  
 
 
 async def charge_energy(user_id: int, cost: int):

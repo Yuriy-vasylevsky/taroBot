@@ -220,12 +220,12 @@ def _build_user_card_kb(user_id: int, page: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="➕ 3 ✨",
-                    callback_data=f"au_add:{user_id}:3:{page}",
+                    text="➕ 10 ✨",
+                    callback_data=f"au_add:{user_id}:10:{page}",
                 ),
                 InlineKeyboardButton(
-                    text="➕ 12 ✨",
-                    callback_data=f"au_add:{user_id}:12:{page}",
+                    text="➕ 20 ✨",
+                    callback_data=f"au_add:{user_id}:20:{page}",
                 ),
             ],
             [

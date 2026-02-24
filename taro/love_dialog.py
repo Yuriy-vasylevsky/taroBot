@@ -22,7 +22,7 @@ import config
 love_taro = Router()
 client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 
-ENERGY_COST_LOVE = 3  # ціна любовного розкладу
+ENERGY_COST_LOVE = 2  
 
 
 async def charge_energy(user_id: int, cost: int):
@@ -586,15 +586,3 @@ async def love_cards(message: types.Message, state: FSMContext):
 
     await state.clear()
 
-
-# # ======================
-# #   КНОПКА "ПОВЕРНЕННЯ В МЕНЮ" (для build_no_energy_kb і подібних)
-# # ======================
-# @love_taro.callback_query(F.data == "back_to_main_menu")
-# async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-#     await callback.message.answer(
-#         "🏠 Повертаємось в головне меню",
-#         reply_markup=popular_menu,
-#     )
-#     await callback.answer()
-#     await state.clear()

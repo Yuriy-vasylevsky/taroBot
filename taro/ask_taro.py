@@ -23,7 +23,7 @@ client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 # ======================
 #   НАЛАШТУВАННЯ ЕНЕРГІЇ
 # ======================
-ENERGY_COST_DIALOG_3CARDS = 3  # ціна цього розкладу
+ENERGY_COST_DIALOG_3CARDS = 2  
 
 
 async def charge_energy_for_spread(user_id: int, cost: int):
@@ -607,16 +607,3 @@ async def tarot_dialog_cards(message: types.Message, state: FSMContext):
     )
 
     await state.clear()
-
-
-# # ======================
-# #   ПОВЕРНЕННЯ В ГОЛОВНЕ МЕНЮ (якщо є кнопка)
-# # ======================
-# @ask_taro.callback_query(F.data == "back_to_main_menu")
-# async def back_to_main_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-#     await callback.message.answer(
-#         "🏠 Повертаємось в головне меню",
-#         reply_markup=menu
-#     )
-#     await callback.answer()
-#     await state.clear()
