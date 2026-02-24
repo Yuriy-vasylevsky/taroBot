@@ -325,8 +325,8 @@ async def energy_topup_stars(callback: types.CallbackQuery):
     await callback.answer()
     text = (
         "⭐ <b>Поповнення за Зірочки Telegram</b>\n\n"
-        "Обирай пакет — оплата миттєво в чаті ✨\n"
-        "Без реквізитів, без ФОП, працює навіть на iOS"
+        # "Обирай пакет — оплата миттєво в чаті ✨\n"
+        # "Без реквізитів, без ФОП, працює навіть на iOS"
     )
     try:
         await callback.message.edit_text(text, reply_markup=build_stars_packages_kb(), parse_mode="HTML")

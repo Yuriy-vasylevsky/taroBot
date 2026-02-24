@@ -62,7 +62,7 @@ async def can_pick_card(user_id: int) -> bool:
     if last.date() == now.date():
         return False   # вже витягнув сьогодні
 
-    return now.hour < 14
+    return now.hour < 12
 
 
 async def update_last_card_picked_time(user_id: int):
@@ -143,9 +143,9 @@ async def open_tarot_webapp(message: types.Message):
 
     print(f"🃏 Запит карти дня від user {user_id} | година: {now.hour}")
 
-    if now.hour >= 14:
+    if now.hour >= 12:
         img = load_notification_image(CARD_TIME_OVER_IMAGE)
-        text = "⚠️ Карта дня більше не доступна сьогодні.\n🌅 Спробуй знову завтра після 00:00."
+        text = "⚠️ Карта дня більше не доступна сьогодні.\n🌅 Спробуй знову завтра."
         await (message.answer_photo(photo=img, caption=text) if img else message.answer(text))
         return
 
