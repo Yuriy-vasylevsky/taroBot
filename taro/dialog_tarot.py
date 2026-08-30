@@ -228,7 +228,7 @@ def build_help_text() -> str:
         "• <b>4 карти</b> — стосунки, почуття\n"
         "• <b>5 карт</b> — робота, гроші, вибір\n"
         "• <b>10 карт</b> — глибокий аналіз\n\n"
-        f"⚡ <b>Вартість:</b> {ENERGY_COST_PER_READING} енергії за розклад або уточнення"
+        f"🍌 <b>Вартість:</b> {ENERGY_COST_PER_READING} банани за розклад або уточнення"
     )
 
 
@@ -1104,9 +1104,9 @@ async def chat(message: types.Message, state: FSMContext):
 
             except RuntimeError:
                 # FIX: не викликаємо state.clear() — користувач ще в чаті,
-                # просто без енергії. Клавіатура виходу залишається доступною.
+                # просто без бананів. Клавіатура виходу залишається доступною.
                 await message.answer(
-                    "🔋 <b>Енергія закінчилась</b> — поповни, щоб продовжити 🔮",
+                    "🍌 <b>Недостатньо бананів</b> — поповни баланс, щоб продовжити 🔮",
                     parse_mode="HTML",
                     reply_markup=build_no_energy_kb(),
                 )
@@ -1214,7 +1214,7 @@ async def chat(message: types.Message, state: FSMContext):
         except RuntimeError:
             # FIX: так само — не чистимо state, користувач залишається в чаті
             await message.answer(
-                "🔋 <b>Енергія закінчилась</b> — поповни, щоб зробити розклад 🔮",
+                "🍌 <b>Недостатньо бананів</b> — поповни баланс, щоб зробити розклад 🔮",
                 parse_mode="HTML",
                 reply_markup=build_no_energy_kb(),
             )

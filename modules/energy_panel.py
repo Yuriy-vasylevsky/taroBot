@@ -240,7 +240,7 @@ def build_energy_keyboard(state: str = "main") -> InlineKeyboardMarkup:
 def build_no_energy_kb() -> InlineKeyboardMarkup:
     """
     Ця функція використовується в taro/ask_taro.py та інших файлах,
-    коли енергії недостатньо. Тепер вона повертає сучасну клавіатуру.
+    коли бананів недостатньо. Внутрішня назва збережена для сумісності.
     """
     return build_energy_keyboard(state="main")
 
@@ -248,16 +248,16 @@ def build_no_energy_kb() -> InlineKeyboardMarkup:
 def build_stars_packages_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚡ 20 енергії — 50 ⭐", callback_data="stars_pack_20")],
-            [InlineKeyboardButton(text="⚡ 50 енергії — 125 ⭐", callback_data="stars_pack_50")],
-            [InlineKeyboardButton(text="⚡ 100 енергії — 220 ⭐", callback_data="stars_pack_100")],
+            [InlineKeyboardButton(text="🍌 20 бананів — 50 ⭐", callback_data="stars_pack_20")],
+            [InlineKeyboardButton(text="🍌 50 бананів — 125 ⭐", callback_data="stars_pack_50")],
+            [InlineKeyboardButton(text="🍌 100 бананів — 220 ⭐", callback_data="stars_pack_100")],
             [InlineKeyboardButton(text="🔙 Назад до панелі", callback_data="energy_back_to_panel")],
         ]
     )
 
 
 def build_invite_friends_kb(link: str) -> InlineKeyboardMarkup:
-    share_text = "🔮 Приєднуйся до мене в найкращому 🃏 Таро боті!\n\n✨ +12 енергії в подарунок ✨\n"
+    share_text = "🔮 Приєднуйся до мене в найкращому 🃏 Таро боті!\n\n🍌 +12 бананів у подарунок 🍌\n"
     encoded_text = urllib.parse.quote(share_text)
     share_url = f"https://t.me/share/url?url={link}&text={encoded_text}"
 
@@ -272,7 +272,7 @@ def build_invite_friends_kb(link: str) -> InlineKeyboardMarkup:
 
 
 # ====================== УНІВЕРСАЛЬНЕ ПОКАЗУВАННЯ ======================
-async def show_energy_panel(callback_or_message, title: str = "⚡ <b>Енергетичний баланс</b>", state: str = "main"):
+async def show_energy_panel(callback_or_message, title: str = "🍌 <b>Баланс бананів</b>", state: str = "main"):
     if isinstance(callback_or_message, types.CallbackQuery):
         msg = callback_or_message.message
         user = callback_or_message.from_user
@@ -285,7 +285,7 @@ async def show_energy_panel(callback_or_message, title: str = "⚡ <b>Енерг
     text = (
         f"{title}\n\n"
         f"👤 {user.full_name}\n"
-        f"✨ Баланс: <b>{energy}</b> енергії\n\n"
+        f"🍌 Баланс: <b>{energy}</b> бананів\n\n"
         f"Обери дію:"
     )
 
@@ -299,7 +299,8 @@ async def show_energy_panel(callback_or_message, title: str = "⚡ <b>Енерг
 
 
 # ====================== ХЕНДЛЕРИ ======================
-@energy_router.message(F.text == "⚡ Поповнити енергію")
+@energy_router.message(F.text == "🍌 Поповнити банани")
+@energy_router.message(F.text == "⚡ Поповнити енергію")  # старі Telegram-клавіатури
 async def open_energy_panel_from_menu(message: types.Message):
     await show_energy_panel(message, state="main")
 
@@ -309,9 +310,9 @@ async def energy_topup(callback: types.CallbackQuery):
     await callback.answer()
     text = (
         "💳 <b>Оплата через касира</b>\n\n"
-        "<b>⚡ 20 </b> - 50 грн \n"
-        "<b>⚡ 50 </b> - 150 грн \n"
-        "<b>⚡ 100 </b> - 200 грн \n\n"
+        "<b>🍌 20 бананів</b> — 50 грн \n"
+        "<b>🍌 50 бананів</b> — 150 грн \n"
+        "<b>🍌 100 бананів</b> — 200 грн \n\n"
         f"{CASHIER_LINK}\n\n"
     )
     try:
@@ -339,16 +340,16 @@ async def buy_stars_pack(callback: types.CallbackQuery):
     await callback.answer("Відкриваю форму оплати...")
     pack_id = callback.data.split("_")[-1]
     packs = {"20": (50, 20), "50": (125, 50), "100": (220, 100)}
-    stars, energy = packs[pack_id]
+    stars, bananas = packs[pack_id]
 
     await callback.bot.send_invoice(
         chat_id=callback.message.chat.id,
-        title=f"⚡ {energy} енергії",
-        description=f"Миттєве поповнення на {energy} енергії ✨",
+        title=f"🍌 {bananas} бананів",
+        description=f"Миттєве поповнення на {bananas} бананів 🍌",
         payload=f"energy_pack_{pack_id}",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label=f"{energy} енергії", amount=stars)],
+        prices=[LabeledPrice(label=f"{bananas} бананів", amount=stars)],
     )
 
 
@@ -360,7 +361,7 @@ async def energy_invite(callback: types.CallbackQuery):
 
     text = (
         "👥 <b>Запроси друзів</b>\n\n"
-        "За кожного друга, який запустить бота – ти отримаєш <b>+12</b> енергії ✨\n\n"
+        "За кожного друга, який запустить бота, ти отримаєш <b>+12</b> бананів 🍌\n\n"
         f"Твоє посилання:\n<code>{link}</code>"
     )
     kb = build_invite_friends_kb(link)
@@ -407,15 +408,15 @@ async def successful_payment_handler(message: types.Message):
         return
 
     pack_id = payment.invoice_payload.split("_")[-1]
-    energy_to_add = {"20": 20, "50": 50, "100": 100}[pack_id]
+    bananas_to_add = {"20": 20, "50": 50, "100": 100}[pack_id]
 
-    await add_energy(message.from_user.id, energy_to_add)
+    await add_energy(message.from_user.id, bananas_to_add)
 
     await message.answer(
         f"✅ <b>Дякуємо!</b>\n\n"
-        f"✨ +{energy_to_add} енергії додано\n"
+        f"🍌 +{bananas_to_add} бананів додано\n"
         f"Баланс оновлено 🔥",
         parse_mode="HTML"
     )
 
-    await show_energy_panel(message, title="⚡ <b>Баланс оновлено!</b>", state="main")
+    await show_energy_panel(message, title="🍌 <b>Баланс оновлено!</b>", state="main")

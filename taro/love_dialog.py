@@ -28,7 +28,7 @@ ENERGY_COST_LOVE = 2
 async def charge_energy(user_id: int, cost: int):
     """
     Повертає:
-    (True, new_balance) – якщо енергії вистачає і списано
+    (True, new_balance) – якщо бананів вистачає і їх списано
     (False, current_balance) – якщо не вистачає
     """
     current = await get_energy(user_id)
@@ -369,7 +369,7 @@ async def love_target(message: types.Message, state: FSMContext):
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_LOVE}✨)",
+                    text=f"🍌 Витратити {ENERGY_COST_LOVE} банани",
                     callback_data="love_pay",
                 )
             ],
@@ -384,7 +384,7 @@ async def love_target(message: types.Message, state: FSMContext):
 
     await message.answer(
         "❤️ Чудово.\n\n"
-        "Щоб активувати любовний розклад, потрібно обмінятись енергією з колодою.\n"
+        "Щоб активувати любовний розклад, потрібно оплатити його бананами 🍌\n"
         "Сфокусуйтесь на цій людині…✨",
         reply_markup=kb,
         parse_mode="HTML",
@@ -428,7 +428,7 @@ async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext)
 
     if not ok:
         await msg.answer(
-            "🔋 <b>Енергія закінчилась</b> – щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            "🍌 <b>Недостатньо бананів</b> — щоб зробити розклад, поповніть баланс.\n\n"
             "Обери дію:",
             parse_mode="HTML",
             reply_markup=build_no_energy_kb(),
@@ -441,11 +441,11 @@ async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext)
     except Exception:
         pass
 
-    anim = await callback.message.bot.send_message(msg.chat.id, "⚡ Обмінюємося енергією…")
+    anim = await callback.message.bot.send_message(msg.chat.id, "🍌 Передаємо банани колоді…")
     try:
         for i in range(4):
             dots = "✨" * (i + 1)
-            await anim.edit_text(f"⚡ Обмінюємося енергією… {dots}")
+            await anim.edit_text(f"🍌 Передаємо банани колоді… {dots}")
             await asyncio.sleep(0.5)
     except Exception:
         pass
@@ -457,7 +457,7 @@ async def love_energy_callback(callback: types.CallbackQuery, state: FSMContext)
 
     await callback.message.bot.send_message(
         msg.chat.id,
-        f"❤️ Енергія прийнята.\nВаш баланс: <b>{balance}</b> ✨",
+        f"🍌 Оплата прийнята.\nВаш баланс: <b>{balance}</b> бананів",
         parse_mode="HTML",
     )
 

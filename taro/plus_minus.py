@@ -32,7 +32,7 @@ ENERGY_COST_PLUS_MINUS = 2  # ціна розкладу "Плюси / Мінус
 
 async def charge_energy_for_plusminus(user_id: int, cost: int):
     """
-    Перевірка та списання енергії для розкладу "Плюси / Мінуси".
+    Перевірка та списання бананів для розкладу "Плюси / Мінуси".
     Повертає (ok, value):
       - ok == True  -> value = новий баланс
       - ok == False -> value = поточний баланс (нічого не списано)
@@ -291,12 +291,12 @@ async def plusminus_question(message: types.Message, state: FSMContext):
 
     await state.update_data(question=question)
 
-    # Інлайн-кнопки для обміну енергією або виходу в меню
+    # Інлайн-кнопки для оплати бананами або виходу в меню
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_PLUS_MINUS}✨)",
+                    text=f"🍌 Витратити {ENERGY_COST_PLUS_MINUS} банани",
                     callback_data="pm_pay",
                 )
             ],
@@ -310,7 +310,7 @@ async def plusminus_question(message: types.Message, state: FSMContext):
     )
 
     msg = await message.answer(
-        "✨Сфокусуйтесь на своєму питанні та обміняйтесь енергією✨\n",
+        "✨ Сфокусуйтесь на своєму питанні та оплатіть розклад бананами 🍌\n",
         reply_markup=kb,
     )
     await remember_dialog_msg(state, msg)
@@ -351,7 +351,7 @@ async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMCon
 
     await callback.answer()
 
-    # 1) Перевірка та списання енергії
+    # 1) Перевірка та списання бананів
     ok, value = await charge_energy_for_plusminus(
         user_id,
         ENERGY_COST_PLUS_MINUS,
@@ -363,7 +363,7 @@ async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMCon
         user = callback.from_user
         
         await msg.answer(
-            f"🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            f"🍌 <b>Недостатньо бананів</b> — щоб зробити розклад, поповніть баланс.\n\n"
             f"Обери дію:",
             parse_mode="HTML",
             reply_markup=build_no_energy_kb()
@@ -379,17 +379,17 @@ async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMCon
     except Exception:
         pass
 
-    # 3) Анімація обміну енергією
+    # 3) Анімація оплати бананами
     anim_msg = await callback.message.bot.send_message(
         chat_id=msg.chat.id,
-        text="⚡ Обмінюємося енергією з колодою… ✨",
+        text="🍌 Передаємо банани колоді… ✨",
     )
 
     try:
         for i in range(4):
             bar = "✨" * (i + 1)
             try:
-                await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+                await anim_msg.edit_text(f"🍌 Передаємо банани колоді… {bar}")
             except Exception:
                 break
             await asyncio.sleep(0.3)
@@ -407,8 +407,8 @@ async def plusminus_energy_callback(callback: types.CallbackQuery, state: FSMCon
     await callback.message.bot.send_message(
         chat_id=msg.chat.id,
         text=(
-            f"⚡ Обмін енергією успішний!\n"
-            f"Ваша енергія: <b>{left}</b> ✨"
+            f"🍌 Оплата успішна!\n"
+            f"Ваш баланс: <b>{left}</b> бананів"
         ),
         parse_mode="HTML",
     )

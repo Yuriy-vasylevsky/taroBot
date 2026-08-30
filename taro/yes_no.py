@@ -256,12 +256,12 @@ async def yesno_question(message: types.Message, state: FSMContext):
     
     await state.update_data(question=question)
 
-    # Інлайн-кнопки "обмінятись енергією" + "назад в меню"
+    # Інлайн-кнопки оплати бананами + "назад в меню"
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_YESNO}✨)",
+                    text=f"🍌 Витратити {ENERGY_COST_YESNO} банани",
                     callback_data="yesno_pay"
                 )
             ],
@@ -275,7 +275,7 @@ async def yesno_question(message: types.Message, state: FSMContext):
     )
 
     msg = await message.answer(
-        "✨Сфокусуйтесь на своєму питанні та обміняйтесь енергією✨\n",
+        "✨ Сфокусуйтесь на своєму питанні та оплатіть розклад бананами 🍌\n",
         reply_markup=kb
     )
     await remember_dialog_msg(state, msg)
@@ -317,7 +317,7 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
 
     await callback.answer()
 
-    # 1) Перевіряємо та списуємо енергію
+    # 1) Перевіряємо та списуємо банани
     ok, value = await charge_energy(user_id, ENERGY_COST_YESNO)
     
     if not ok:
@@ -326,7 +326,7 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
         user = callback.from_user
         
         await msg.answer(
-            f"🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            f"🍌 <b>Недостатньо бананів</b> — щоб зробити розклад, поповніть баланс.\n\n"
             f"Обери дію:",
             parse_mode="HTML",
             reply_markup=build_no_energy_kb()
@@ -342,17 +342,17 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
     except Exception:
         pass
 
-    # 3) Анімація "обміну енергією"
+    # 3) Анімація оплати бананами
     anim_msg = await callback.message.bot.send_message(
         chat_id=callback.message.chat.id,
-        text="⚡ Обмінюємося енергією з колодою… ✨",
+        text="🍌 Передаємо банани колоді… ✨",
     )
 
     try:
         for i in range(4):
             bar = "✨" * (i + 1)
             try:
-                await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+                await anim_msg.edit_text(f"🍌 Передаємо банани колоді… {bar}")
             except Exception:
                 break
             await asyncio.sleep(0.3)
@@ -370,8 +370,8 @@ async def yesno_energy_callback(callback: types.CallbackQuery, state: FSMContext
     await callback.message.bot.send_message(
         chat_id=callback.message.chat.id,
         text=(
-            "⚡ Обмін енергією успішний!\n"
-            f"Ваша енергія: <b>{left}</b> ✨"
+            "🍌 Оплата успішна!\n"
+            f"Ваш баланс: <b>{left}</b> бананів"
         ),
         parse_mode="HTML",
     )

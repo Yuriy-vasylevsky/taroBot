@@ -25,7 +25,7 @@ def build_main_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
         [
             [KeyboardButton(text="🔮 Живий Таро-чат")],
             [KeyboardButton(text="📚 Популярні розклади")],
-            [   KeyboardButton(text="⚡ Поповнити енергію"),
+            [   KeyboardButton(text="🍌 Поповнити банани"),
                 KeyboardButton(
                     text="🖼 Переглянути карти",
                     web_app=WebAppInfo(url=VIEW_ALL_CARDS_URL),
@@ -67,7 +67,7 @@ popular_menu = ReplyKeyboardMarkup(
 def admin_menu() -> ReplyKeyboardMarkup:
     keyboard = [
         ["👥 Користувачі"],
-        ["⚡ Енергія користувачів"],
+        ["🍌 Банани користувачів"],
         ["🔙 Назад в меню"],
     ]
 

@@ -44,7 +44,7 @@ async def start_cmd(message: types.Message):
                 try:
                     await message.bot.send_message(
                         referrer_id,
-                        "🎉 Ви отримали <b>+12 енергії</b> за запрошеного друга!",
+                        "🎉 Ви отримали <b>+12 бананів 🍌</b> за запрошеного друга!",
                         parse_mode="HTML"
                     )
                 except:

@@ -150,7 +150,8 @@ async def track_user_activity(
 
 async def change_energy(user_id: int, delta: int):
     """
-    Додає / віднімає енергію (може бути від'ємною).
+    Додає / віднімає банани. Назву функції та колонку energy збережено,
+    щоб не втратити існуючі баланси користувачів.
     """
     async with aiosqlite.connect(DB_PATH) as db:
         # гарантуємо, що юзер є
@@ -305,7 +306,7 @@ async def reward_referral(referrer_id: int):
 
         ref_id = row[0]
 
-        # видати енергію
+        # видати банани
         await db.execute(
             "UPDATE users SET energy = energy + 12 WHERE user_id = ?",
             (referrer_id,)
@@ -324,22 +325,19 @@ async def reward_referral(referrer_id: int):
 # ====================== ПОПОВНЕННЯ ЗА TELEGRAM STARS ======================
 async def add_energy(user_id: int, amount: int):
     """
-    Зручна функція саме для поповнення енергії після оплати Зірочками.
+    Зручна функція для поповнення бананів після оплати Зірочками.
     Використовується в successful_payment_handler.
     Автоматично логує дію.
     """
-    await change_energy(user_id, amount)                    # додаємо енергію
+    await change_energy(user_id, amount)                    # додаємо банани
 
     # Логуємо в user_actions (щоб було видно в адмінці)
-    await _log_action(user_id, f"⭐ Поповнення {amount} енергії за Telegram Stars (XTR)")
+    await _log_action(user_id, f"⭐ Поповнення {amount} бананів за Telegram Stars (XTR)")
 
 
 async def log_star_payment(user_id: int, pack_id: str, stars: int, energy: int):
     """
     (Опціонально) Детальний лог платежу — якщо захочеш потім робити статистику продажів.
     """
-    action_text = f"Купив пакет {pack_id} ({energy} енергії) за {stars} XTR"
+    action_text = f"Купив пакет {pack_id} ({energy} бананів) за {stars} XTR"
     await _log_action(user_id, action_text)
-
-
-    

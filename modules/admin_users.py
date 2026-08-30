@@ -86,7 +86,7 @@ def _short_name(u: dict) -> str:
 # ============================================================
 def _build_list_text(page: int, total_pages: int) -> str:
     return (
-        "⚡ <b>Енергія користувачів</b>\n"
+        "🍌 <b>Банани користувачів</b>\n"
         f"Сторінка {page} з {total_pages}\n\n"
         "Натисни на ім’я, щоб відкрити картку користувача."
     )
@@ -204,7 +204,7 @@ def _build_user_card_text(u: dict) -> str:
         f"👤 <b>{fname}</b>\n"
         f"🔗 Профіль: {profile_link}\n"
         f"🆔 <code>{uid}</code>\n"
-        f"🔋 Енергія: <b>{energy}</b> ✨\n"
+        f"🍌 Банани: <b>{energy}</b>\n"
         f"🕒 Активність: {last}\n\n"
         f"📨 <b>Дії користувача:</b>\n{actions_block}"
     )
@@ -220,11 +220,11 @@ def _build_user_card_kb(user_id: int, page: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="➕ 10 ✨",
+                    text="➕ 10 🍌",
                     callback_data=f"au_add:{user_id}:10:{page}",
                 ),
                 InlineKeyboardButton(
-                    text="➕ 20 ✨",
+                    text="➕ 20 🍌",
                     callback_data=f"au_add:{user_id}:20:{page}",
                 ),
             ],
@@ -241,7 +241,8 @@ def _build_user_card_kb(user_id: int, page: int) -> InlineKeyboardMarkup:
 # ============================================================
 # Всі користувачі — вхідна кнопка
 # ============================================================
-@admin_users_router.message(F.text == "⚡ Енергія користувачів")
+@admin_users_router.message(F.text == "🍌 Банани користувачів")
+@admin_users_router.message(F.text == "⚡ Енергія користувачів")  # старі Telegram-клавіатури
 async def show_users_energy(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
@@ -327,7 +328,7 @@ async def open_user_card(callback: types.CallbackQuery):
 
 
 # ============================================================
-# Нарахувати енергію
+# Нарахувати банани
 # ============================================================
 @admin_users_router.callback_query(F.data.startswith("au_add:"))
 async def add_energy(callback: types.CallbackQuery):
@@ -348,7 +349,7 @@ async def add_energy(callback: types.CallbackQuery):
     new_energy = await get_energy(user_id)
 
     await callback.answer(
-        f"✨ Додано {amount}. Нова енергія: {new_energy}",
+        f"🍌 Додано {amount}. Новий баланс: {new_energy} бананів",
         show_alert=True,
     )
 

@@ -100,7 +100,7 @@ async def _render_users_page(page: int) -> tuple[str, InlineKeyboardMarkup | Non
         block = (
             f"<b>#{idx}.</b> 👤 {fname} {uname}\n"
             f"🆔 <code>{uid}</code>\n"
-            f"🔋 Енергія: <b>{energy}</b>\n"
+            f"🍌 Банани: <b>{energy}</b>\n"
             f"🕒 Активність: {last_active}\n"
             f"📜 Останні дії:\n{actions_lines}\n"
         )

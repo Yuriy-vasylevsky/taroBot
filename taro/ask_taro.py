@@ -349,7 +349,7 @@ async def tarot_dialog_question(message: types.Message, state: FSMContext):
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text=f"⚡ Обмінятись енергією ({ENERGY_COST_DIALOG_3CARDS}✨)",
+                    text=f"🍌 Витратити {ENERGY_COST_DIALOG_3CARDS} банани",
                     callback_data="dialog3_pay",
                 )
             ],
@@ -363,7 +363,7 @@ async def tarot_dialog_question(message: types.Message, state: FSMContext):
     )
 
     msg3 = await message.answer(
-        "✨Сфокусуйтесь на своєму питанні та обміняйтесь енергією✨\n",
+        "✨ Сфокусуйтесь на своєму питанні та оплатіть розклад бананами 🍌\n",
         reply_markup=kb,
         parse_mode="HTML",
     )
@@ -415,7 +415,7 @@ async def tarot_energy_callback(callback: types.CallbackQuery, state: FSMContext
         user = callback.from_user
         
         await msg.answer(
-            f"🔋 <b>Енергія закінчилась</b> — щоб зробити розклад, потрібно поповнити ⚡\n\n"
+            f"🍌 <b>Недостатньо бананів</b> — щоб зробити розклад, поповніть баланс.\n\n"
             f"Обери дію:",
             parse_mode="HTML",
             reply_markup=build_no_energy_kb()
@@ -431,13 +431,13 @@ async def tarot_energy_callback(callback: types.CallbackQuery, state: FSMContext
 
     anim_msg = await callback.message.bot.send_message(
         chat_id=callback.message.chat.id,
-        text="⚡ Обмінюємося енергією з колодою… ✨",
+        text="🍌 Передаємо банани колоді… ✨",
     )
 
     try:
         for i in range(4):
             bar = "✨" * (i + 1)
-            await anim_msg.edit_text(f"⚡ Обмінюємося енергією… {bar}")
+            await anim_msg.edit_text(f"🍌 Передаємо банани колоді… {bar}")
             await asyncio.sleep(0.3)
     except Exception:
         pass
@@ -451,8 +451,8 @@ async def tarot_energy_callback(callback: types.CallbackQuery, state: FSMContext
     await callback.message.bot.send_message(
         chat_id=callback.message.chat.id,
         text=(
-            "⚡ Обмін енергією успішний!\n"
-            f"Ваша енергія: <b>{left}</b> ✨"
+            "🍌 Оплата успішна!\n"
+            f"Ваш баланс: <b>{left}</b> бананів"
         ),
         parse_mode="HTML",
     )
