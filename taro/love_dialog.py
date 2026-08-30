@@ -278,7 +278,6 @@ async def interpret_love_cards_gpt(target_name: str, cards_display: str, layout:
             {"role": "system", "content": SYSTEM_PROMPT_LOVE},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=900,
         temperature=0.9,
     )
     return resp.choices[0].message.content

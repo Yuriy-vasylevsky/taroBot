@@ -482,7 +482,6 @@ async def _openai_create_with_retry(
     *,
     model: str,
     messages: List[Dict[str, str]],
-    max_tokens: int,
     temperature: float,
     want_json: bool = False,
     user_id: int = 0,
@@ -493,7 +492,6 @@ async def _openai_create_with_retry(
             kwargs: Dict[str, Any] = {
                 "model": model,
                 "messages": messages,
-                "max_tokens": max_tokens,
                 "temperature": temperature,
             }
             if want_json:
@@ -550,7 +548,6 @@ async def generate_human_chat_reply(user_id: int, user_text: str, hint: str = ""
                 {"role": "system", "content": HUMAN_CHAT_PROMPT},
                 {"role": "user", "content": payload},
             ],
-            max_tokens=420,
             temperature=0.95,
             user_id=user_id,
         )
@@ -571,7 +568,6 @@ async def manager_decide(user_id: int, user_text: str) -> Dict[str, Any]:
                 {"role": "system", "content": CHAT_MANAGER_PROMPT},
                 {"role": "user", "content": payload},
             ],
-            max_tokens=260,
             temperature=0.35,
             want_json=True,
             user_id=user_id,
@@ -649,7 +645,6 @@ async def choose_spread_via_gpt(user_text: str) -> Tuple[int, str, List[str]]:
                 {"role": "system", "content": SPREAD_SELECTOR_PROMPT},
                 {"role": "user", "content": user_text},
             ],
-            max_tokens=260,
             temperature=0.15,
             want_json=True,
         )
@@ -1088,7 +1083,6 @@ async def chat(message: types.Message, state: FSMContext):
                             {"role": "system", "content": CLARIFIER_PROMPT},
                             {"role": "user", "content": payload},
                         ],
-                        max_tokens=1600,
                         temperature=0.82,
                         user_id=user_id,
                     )
@@ -1199,7 +1193,6 @@ async def chat(message: types.Message, state: FSMContext):
                         {"role": "system", "content": TAROT_SYSTEM_PROMPT},
                         {"role": "user", "content": payload},
                     ],
-                    max_tokens=2000,
                     temperature=0.82,
                     user_id=user_id,
                 )

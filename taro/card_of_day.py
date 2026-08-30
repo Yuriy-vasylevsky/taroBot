@@ -129,7 +129,6 @@ async def interpret_card(display_name: str):
                 "content": f"Карта дня: {display_name}\nДай тлумачення згідно структури.",
             },
         ],
-        max_tokens=450,
         temperature=0.85,
     )
     return completion.choices[0].message.content

@@ -194,7 +194,6 @@ async def interpret_horseshoe(question: str, cards_display: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT_HORSESHOE},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=1500,
         temperature=0.9,
     )
 

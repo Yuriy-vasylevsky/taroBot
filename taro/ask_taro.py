@@ -261,7 +261,6 @@ async def interpret_cards_gpt(
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=800,
         temperature=0.9,
     )
 

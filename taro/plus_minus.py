@@ -210,7 +210,6 @@ async def interpret_plus_minus(question: str, cards_display: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT_PLUS_MINUS},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=800,
         temperature=0.9,
     )
 
