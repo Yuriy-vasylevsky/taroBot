@@ -47,7 +47,7 @@ if not logger.handlers:
 # ROUTER + OPENAI
 # ======================
 dialog_router = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 # ======================
 # PATHS + SETTINGS
@@ -545,7 +545,7 @@ async def generate_human_chat_reply(user_id: int, user_text: str, hint: str = ""
         payload += f"\nНотатка:\n{hint}\n"
     try:
         resp = await _openai_create_with_retry(
-            model="gpt-4o-mini",
+            model=config.DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": HUMAN_CHAT_PROMPT},
                 {"role": "user", "content": payload},
@@ -566,7 +566,7 @@ async def manager_decide(user_id: int, user_text: str) -> Dict[str, Any]:
     payload = f"ТИП: Диспетчер\nМова: українська\n\nКороткий контекст:\n{short_context(user_id)}\n\nПовідомлення користувача:\n{user_text}"
     try:
         r = await _openai_create_with_retry(
-            model="gpt-4o-mini",
+            model=config.DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": CHAT_MANAGER_PROMPT},
                 {"role": "user", "content": payload},
@@ -644,7 +644,7 @@ async def choose_spread_via_gpt(user_text: str) -> Tuple[int, str, List[str]]:
 
     try:
         r = await _openai_create_with_retry(
-            model="gpt-4o-mini",
+            model=config.DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": SPREAD_SELECTOR_PROMPT},
                 {"role": "user", "content": user_text},
@@ -1083,7 +1083,7 @@ async def chat(message: types.Message, state: FSMContext):
                     spinner = await start_spinner(message)
 
                     resp = await _openai_create_with_retry(
-                        model="gpt-4o-mini",
+                        model=config.DEEPSEEK_MODEL,
                         messages=[
                             {"role": "system", "content": CLARIFIER_PROMPT},
                             {"role": "user", "content": payload},
@@ -1194,7 +1194,7 @@ async def chat(message: types.Message, state: FSMContext):
                 spinner = await start_spinner(message)
 
                 resp = await _openai_create_with_retry(
-                    model="gpt-4o" if amount >= 5 else "gpt-4o-mini",
+                    model=config.DEEPSEEK_MODEL,
                     messages=[
                         {"role": "system", "content": TAROT_SYSTEM_PROMPT},
                         {"role": "user", "content": payload},

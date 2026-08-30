@@ -21,7 +21,7 @@ from modules.user_stats_db import get_energy, change_energy
 
 
 plus_minus = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 
 # ======================
@@ -205,7 +205,7 @@ async def interpret_plus_minus(question: str, cards_display: str) -> str:
     )
 
     resp = await client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_PLUS_MINUS},
             {"role": "user", "content": prompt},

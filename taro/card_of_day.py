@@ -21,7 +21,7 @@ from cards_data import TAROT_CARDS
 from modules.menu import popular_menu
 
 card_router = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 WEBAPP_URL = "https://yuriy-vasylevsky.github.io/tarot-webapp/"
 
@@ -121,7 +121,7 @@ SYSTEM_PROMPT = """
 
 async def interpret_card(display_name: str):
     completion = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {

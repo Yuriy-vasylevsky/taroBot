@@ -21,7 +21,7 @@ from modules.user_stats_db import get_energy, change_energy
 
 
 yes_no = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 # ======================
 #    НАЛАШТУВАННЯ ЕНЕРГІЇ
@@ -172,7 +172,7 @@ async def interpret_yes_no(question: str, cards_display: str):
     )
 
     resp = await client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_YESNO},
             {"role": "user", "content": prompt},

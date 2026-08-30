@@ -17,7 +17,7 @@ import config
 from modules.user_stats_db import get_energy, change_energy
 
 ask_taro = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 
 # ======================
@@ -256,7 +256,7 @@ async def interpret_cards_gpt(
     )
 
     resp = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},

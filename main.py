@@ -109,3 +109,27 @@ async def main():
 if __name__ == "__main__":
     
     asyncio.run(main())
+
+
+
+
+
+    #                          ssh root@77.42.71.244  
+#                           mPLmmcFnpcmK
+
+#    Подивитись логи:     journalctl -u tgbot -f
+#    Оновити код після змін у GitHub:    cd /root/tgbot/tgbot && git pull && systemctl restart tgbot
+
+
+#              systemctl restart taroBot    
+#              systemctl stop taroBot       
+#              systemctl start taroBot      
+#              systemctl status taroBot     
+
+# 77.42.71.244	
+
+# lTWMUl0FnG9yLS34bCLevmmK3W95ULmPupySbFDI28lWvb8S5GqJPIhWdX4hR2r7
+
+# cd /root/taroBot
+
+# systemctl start safe-250-web

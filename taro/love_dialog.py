@@ -20,7 +20,7 @@ import config
 
 
 love_taro = Router()
-client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
+client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
 
 ENERGY_COST_LOVE = 2  
 
@@ -273,7 +273,7 @@ async def interpret_love_cards_gpt(target_name: str, cards_display: str, layout:
     )
 
     resp = await client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_LOVE},
             {"role": "user", "content": prompt},
