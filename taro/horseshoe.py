@@ -13,6 +13,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 from modules.menu import menu, popular_menu
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
@@ -84,15 +86,19 @@ SYSTEM_PROMPT_HORSESHOE = """
 6 — Зовнішній вплив
 7 — Потенційний результат
 
+Пиши українською, лаконічно, змістовно й без повторів.
+Кожен блок — 1–2 короткі речення, між блоками один порожній рядок.
+Додавай лише доречні емодзі. Не використовуй Markdown, HTML, зірочки чи решітки.
+
 Структура відповіді:
-1) 🕰 Минуле
-2) 🎯 Теперішнє
-3) 🔮 Майбутнє
-4) 👁️ Приховане
-5) 🧭 Порада
-6) 🌐 Зовнішній вплив
-7) ⭐ Потенційний результат
-8) 💛 Ключове послання розкладу
+🕰 Минуле
+🎯 Теперішнє
+🔮 Майбутнє
+👁️ Приховане
+🧭 Порада
+🌐 Зовнішній вплив
+⭐ Потенційний результат
+💛 Ключове послання: 1 коротке речення.
 """
 
 
@@ -197,7 +203,7 @@ async def interpret_horseshoe(question: str, cards_display: str) -> str:
         temperature=0.9,
     )
 
-    return resp.choices[0].message.content
+    return clean_generated_text(resp.choices[0].message.content)
 
 
 # ======================
@@ -519,13 +525,21 @@ async def horseshoe_cards(message: types.Message, state: FSMContext):
             pass
 
     # Відповідь користувачу
-    await message.answer(
+    await answer_long_text(
+        message,
         f"<b>❓ Питання:</b> {question}\n\n"
         f"<b>🍀 Розклад Підкова:</b>\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{interpretation}",
         parse_mode="HTML",
         reply_markup=popular_menu,
+    )
+    await offer_spread_extension(
+        message,
+        question=question,
+        spread_name="Підкова",
+        original_interpretation=interpretation,
+        excluded_cards=[card.get("name") for card in chosen],
     )
 
     # Чистимо тимчасовий файл

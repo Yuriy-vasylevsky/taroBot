@@ -19,6 +19,7 @@ from typing import Optional
 import config
 from cards_data import TAROT_CARDS
 from modules.menu import popular_menu
+from modules.telegram_text import answer_long_text, clean_generated_text
 
 card_router = Router()
 client = AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL)
@@ -109,13 +110,15 @@ def load_notification_image(path: str) -> Optional[BufferedInputFile]:
 # ====================== GPT ======================
 SYSTEM_PROMPT = """
 Ти — досвідчений містичний таролог-наставник.
-Дай відповідь українською, тепло, структуровано.
+Дай відповідь українською, тепло, лаконічно й структуровано.
+Кожен блок — 1–2 короткі речення, між блоками один порожній рядок.
+Додавай лише доречні емодзі. Не використовуй Markdown, HTML, зірочки чи решітки.
 
 Структура відповіді:
-1) 🔮 Ключова тема дня
-2) ✨ Енергія дня
-3) 💡 Порада
-4) ⚠️ Чого уникати
+🔮 Ключова тема дня
+✨ Настрій дня
+💡 Порада
+⚠️ Чого уникати
 """
 
 
@@ -131,7 +134,7 @@ async def interpret_card(display_name: str):
         ],
         temperature=0.85,
     )
-    return completion.choices[0].message.content
+    return clean_generated_text(completion.choices[0].message.content)
 
 
 # ====================== ХЕНДЛЕРИ ======================
@@ -215,7 +218,8 @@ async def on_webapp_data(message: types.Message):
         # Зберігаємо, що карта витягнута
         await update_last_card_picked_time(message.from_user.id)
 
-        await message.answer(
+        await answer_long_text(
+            message,
             f"<b>{display_name}</b>\n\n{interpretation}",
             parse_mode="HTML",
             reply_markup=popular_menu,

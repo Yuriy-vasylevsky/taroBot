@@ -32,6 +32,8 @@ from modules.menu import build_main_menu
 from modules.user_stats_db import get_energy, change_energy
 from modules.tarot_spread_image import combine_spread_image
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 
 # ======================
 # LOGGING
@@ -97,12 +99,12 @@ DEFAULT_TAROT_SYSTEM_PROMPT = """
 🎯 Фокус запиту: 1 коротке речення.
 🔮 Розклад: <назва>
 🧩 По позиціях:
-1) <позиція> — <карта> (⬆️/⬇️): 2–4 речення
+1) <позиція> — <карта> (⬆️/⬇️): 1–2 короткі речення
 ...
-✨ Зв'язки між картами: 3–6 речень
-🧭 Висновок: 2–4 речення
+✨ Зв'язки між картами: 2–3 речення
+🧭 Висновок: 1–2 речення
 ✅ Практична порада:
-- 3 конкретні кроки
+- 3 конкретні однорядкові кроки
 
 ПСИХОЛОГІЧНА БЕЗПЕКА:
 - "важкі" карти — як сигнал/тема уваги ⚠️, без фаталізму
@@ -161,6 +163,8 @@ DEFAULT_HUMAN_CHAT_PROMPT = r"""
 - НЕ "допитуй": максимум 1 коротке питання і тільки якщо реально доречно.
 - Якщо користувач явно просить розклад/карти/прогноз — скажи одне речення, що зробиш розклад (сам запуск робить код).
 - Без HTML і без markdown. PLAIN TEXT.
+- Відповідай лаконічно: зазвичай 1–3 короткі речення.
+- Додавай максимум 1–2 доречні емодзі.
 """
 
 CLARIFIER_PROMPT = getattr(
@@ -171,12 +175,12 @@ CLARIFIER_PROMPT = getattr(
 - короткий підсумок попереднього розкладу
 - 1 уточнюючу карту
 
-Завдання: дати РОЗШИРЕНЕ уточнення — як ця карта доповнює/змінює попередній висновок.
+Завдання: стисло пояснити, як ця карта доповнює або змінює попередній висновок.
 Ти тлумачиш ТІЛЬКИ цю уточнюючу карту і логічно привʼязуєш її до попереднього.
 
 ФОРМАТ (PLAIN TEXT):
-🃏 Уточнення: <карта> (⬆️/⬇️) — 3–6 речень по суті
-✨ Як це впливає на попередній розклад: 3–6 речень
+🃏 Уточнення: <карта> (⬆️/⬇️) — 2–3 речення по суті
+✨ Вплив на попередній розклад: 2–3 речення
 ✅ Практика (3 кроки):
 - ...
 - ...
@@ -188,6 +192,18 @@ TAROT_SYSTEM_PROMPT = getattr(config, "TAROT_SYSTEM_PROMPT", DEFAULT_TAROT_SYSTE
 SPREAD_SELECTOR_PROMPT = getattr(config, "TAROT_SPREAD_SELECTOR_PROMPT", DEFAULT_SPREAD_SELECTOR_PROMPT)
 CHAT_MANAGER_PROMPT = getattr(config, "TAROT_CHAT_MANAGER_PROMPT", DEFAULT_CHAT_MANAGER_PROMPT)
 HUMAN_CHAT_PROMPT = getattr(config, "TAROT_HUMAN_CHAT_PROMPT", DEFAULT_HUMAN_CHAT_PROMPT)
+
+OUTPUT_STYLE_RULES = """
+СТИЛЬ ВІДПОВІДІ:
+- Лаконічно, структуровано, без води та повторів.
+- Між змістовими блоками залишай один порожній рядок.
+- Додавай лише доречні емодзі, не перевантажуй ними текст.
+- Не використовуй Markdown, HTML, зірочки, решітки чи зворотні лапки.
+- Заголовки пиши звичайним текстом з одним емодзі на початку.
+"""
+TAROT_SYSTEM_PROMPT = f"{TAROT_SYSTEM_PROMPT}\n\n{OUTPUT_STYLE_RULES}"
+CLARIFIER_PROMPT = f"{CLARIFIER_PROMPT}\n\n{OUTPUT_STYLE_RULES}"
+HUMAN_CHAT_PROMPT = f"{HUMAN_CHAT_PROMPT}\n\n{OUTPUT_STYLE_RULES}"
 
 # ================== UI ==================
 HELP_BTN_TEXT = "ℹ️ Як користуватись"
@@ -551,7 +567,7 @@ async def generate_human_chat_reply(user_id: int, user_text: str, hint: str = ""
             temperature=0.95,
             user_id=user_id,
         )
-        text = (resp.choices[0].message.content or "").strip()
+        text = clean_generated_text(resp.choices[0].message.content or "")
         text = _limit_questions(text, max_q=1)
         return text or smalltalk_reply()
     except Exception:
@@ -588,7 +604,7 @@ async def manager_decide(user_id: int, user_text: str) -> Dict[str, Any]:
             except Exception:
                 amount = None
 
-        reply = str(data.get("reply", "")).strip()
+        reply = clean_generated_text(str(data.get("reply", "")))
         reply = _limit_questions(reply, max_q=1)
 
         return {"mode": mode, "reply": reply, "amount": amount}
@@ -722,7 +738,7 @@ def strip_bad_phrases(text: str) -> str:
         if any(p.search(low) for p in BAD_LINE_PATTERNS):
             continue
         cleaned.append(ln)
-    return "\n".join(cleaned).strip()
+    return clean_generated_text("\n".join(cleaned))
 
 
 # ================== IMAGE RENDERING ==================
@@ -1091,7 +1107,7 @@ async def chat(message: types.Message, state: FSMContext):
                     await spinner.stop()
                     spinner = None
 
-                    await message.answer(final_reply)
+                    await answer_long_text(message, final_reply)
                     add_chat_message(user_id, "assistant", final_reply)
 
                     last_reading[user_id] = {
@@ -1124,17 +1140,17 @@ async def chat(message: types.Message, state: FSMContext):
 
         if decision["mode"] == "chat":
             if decision.get("reply"):
-                await message.answer(decision["reply"])
+                await answer_long_text(message, decision["reply"])
                 add_chat_message(user_id, "assistant", decision["reply"])
                 return
             reply = await generate_human_chat_reply(user_id, user_text)
-            await message.answer(reply)
+            await answer_long_text(message, reply)
             add_chat_message(user_id, "assistant", reply)
             return
 
         if decision["mode"] == "clarify":
             reply = decision.get("reply") or "Уточни, будь ласка, одну річ..."
-            await message.answer(reply)
+            await answer_long_text(message, reply)
             add_chat_message(user_id, "assistant", reply)
             mark_clarified(user_id)
             return
@@ -1201,7 +1217,7 @@ async def chat(message: types.Message, state: FSMContext):
                 await spinner.stop()
                 spinner = None
 
-                await message.answer(final_reply)
+                await answer_long_text(message, final_reply)
                 add_chat_message(user_id, "assistant", final_reply)
 
                 last_reading[user_id] = {
@@ -1210,6 +1226,13 @@ async def chat(message: types.Message, state: FSMContext):
                     "cards": cards,
                     "short": final_reply[:450],
                 }
+                await offer_spread_extension(
+                    message,
+                    question=effective_question,
+                    spread_name=spread_name,
+                    original_interpretation=final_reply,
+                    excluded_cards=[card["code"] for card in cards],
+                )
 
         except RuntimeError:
             # FIX: так само — не чистимо state, користувач залишається в чаті

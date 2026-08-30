@@ -13,6 +13,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 from modules.menu import menu, popular_menu
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
@@ -87,12 +89,14 @@ SYSTEM_PROMPT_PLUS_MINUS = """
 
 Твоє завдання — допомогти людині зважити рішення.
 Пиши українською або російською, як звертаються.
+Пиши лаконічно, красиво й конкретно. Відділяй блоки одним порожнім рядком.
+Додавай лише доречні емодзі. Не використовуй Markdown, HTML, зірочки чи решітки.
 
 Структура відповіді:
-1) 🔮 Підсумок (скоріше так / скоріше ні / нейтрально)
-2) ➕ Плюси — розбір першої карти
-3) ➖ Мінуси — розбір другої карти
-4) 🌙 Рекомендація (як краще вчинити, на що звернути увагу)
+🔮 Підсумок: скоріше так / скоріше ні / нейтрально + 1 речення.
+➕ Плюси: 2–3 короткі речення про першу карту.
+➖ Мінуси: 2–3 короткі речення про другу карту.
+🧭 Рекомендація: конкретний і практичний висновок у 1–2 реченнях.
 """
 
 
@@ -213,7 +217,7 @@ async def interpret_plus_minus(question: str, cards_display: str) -> str:
         temperature=0.9,
     )
 
-    return resp.choices[0].message.content
+    return clean_generated_text(resp.choices[0].message.content)
 
 
 # ======================
@@ -548,13 +552,21 @@ async def plusminus_cards(message: types.Message, state: FSMContext):
             pass
 
     # 4️⃣ Відповідь користувачу
-    await message.answer(
+    await answer_long_text(
+        message,
         f"<b>❓ Питання:</b> {question}\n\n"
         f"<b>➕➖ Розклад: Плюси / Мінуси</b>\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{interpretation}",
         parse_mode="HTML",
         reply_markup=popular_menu,
+    )
+    await offer_spread_extension(
+        message,
+        question=question,
+        spread_name="Плюси / Мінуси",
+        original_interpretation=interpretation,
+        excluded_cards=[card.get("name") for card in chosen],
     )
 
     try:

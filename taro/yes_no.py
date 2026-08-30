@@ -13,6 +13,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 from modules.menu import menu, popular_menu
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 from cards_data import TAROT_CARDS
 from openai import AsyncOpenAI
 import config
@@ -85,10 +87,15 @@ SYSTEM_PROMPT_YESNO = """
 2 — Прихована причина
 3 — Ймовірний результат
 
+Пиши лаконічно, тепло й конкретно. Відділяй блоки одним порожнім рядком.
+Доречні емодзі вітаються, але не перевантажуй ними текст.
+Не використовуй Markdown, HTML, зірочки, решітки та декоративні символи.
+
 Структура:
-1) 🔮 Підсумок
-2) ✨ Короткий розбір
-3) 🌙 Висновок
+🔮 Відповідь: один чіткий варіант і коротке пояснення.
+🃏 Що показують карти: по одному стислому реченню на кожну карту.
+🌙 Висновок: 1–2 речення.
+💡 Порада: один практичний крок.
 """
 
 
@@ -180,7 +187,7 @@ async def interpret_yes_no(question: str, cards_display: str):
         temperature=0.9,
     )
 
-    return resp.choices[0].message.content
+    return clean_generated_text(resp.choices[0].message.content)
 
 
 # ======================
@@ -499,13 +506,21 @@ async def yesno_cards(message: types.Message, state: FSMContext):
             pass
 
     # 4) Відповідь користувачу
-    await message.answer(
+    await answer_long_text(
+        message,
         f"<b>❓ Питання:</b> {question}\n\n"
         f"<b>🔮 Розклад:</b> Так / Ні\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{interpretation}",
         parse_mode="HTML",
         reply_markup=popular_menu
+    )
+    await offer_spread_extension(
+        message,
+        question=question,
+        spread_name="Так / Ні",
+        original_interpretation=interpretation,
+        excluded_cards=[card.get("name") for card in chosen],
     )
 
     # Чистимо тимчасовий файл

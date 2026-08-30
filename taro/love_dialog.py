@@ -12,6 +12,8 @@ from aiogram.fsm.state import State, StatesGroup
 
 from modules.menu import popular_menu
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 from modules.user_stats_db import get_energy, change_energy
 from cards_data import TAROT_CARDS
 
@@ -48,15 +50,17 @@ SYSTEM_PROMPT_LOVE = """
 Поважай особисті кордони, не давай категоричних обіцянок ("назавжди", "гарантовано").
 Не лякай, не маніпулюй, не засуджуй. Підкреслюй цінність людини незалежно від партнера.
 Пиши українською або російською – так, як до тебе звертаються.
+Пиши лаконічно, естетично й без повторів. Відділяй блоки одним порожнім рядком.
+Додавай лише доречні емодзі. Не використовуй Markdown, HTML, зірочки чи решітки.
 
 Розклад робиться не "взагалі", а про конкретний зв'язок – людину, яку користувач позначає ім'ям або описом
 (наприклад, "Олег", "чоловік", "колишня", "дівчина з роботи", "людина з побачень").
 
 Структура відповіді:
-1) ❤️ Загальний настрій / тема стосунків
-2) 👁 Розбір кожної карти по позиціях розкладу
-3) 🌙 Висновок про стосунки
-4) 💌 Порада серцю
+❤️ Загальний настрій: 1–2 речення.
+👁 Карти: кожна позиція окремо, по 1–2 короткі речення.
+🌙 Висновок про стосунки: 1–2 речення без категоричних прогнозів.
+💌 Порада серцю: один конкретний, турботливий крок.
 """
 
 
@@ -280,7 +284,7 @@ async def interpret_love_cards_gpt(target_name: str, cards_display: str, layout:
         ],
         temperature=0.9,
     )
-    return resp.choices[0].message.content
+    return clean_generated_text(resp.choices[0].message.content)
 
 
 # ======================
@@ -569,13 +573,21 @@ async def love_cards(message: types.Message, state: FSMContext):
         except Exception:
             pass
 
-    await message.answer(
+    await answer_long_text(
+        message,
         f"<b>👤 Для кого розклад:</b> {target_name}\n\n"
         f"<b>❤️ Любовний розклад:</b> {layout['name']}\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{text}",
         parse_mode="HTML",
         reply_markup=popular_menu,
+    )
+    await offer_spread_extension(
+        message,
+        question=f"Стосунки з {target_name}",
+        spread_name=layout["name"],
+        original_interpretation=text,
+        excluded_cards=[card.get("name") for card in chosen],
     )
 
     try:

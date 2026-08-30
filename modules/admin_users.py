@@ -1,5 +1,6 @@
 from math import ceil
 from datetime import datetime, timedelta
+import html
 
 from aiogram import Router, F, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -75,10 +76,12 @@ def _short_name(u: dict) -> str:
     uname = (u.get("username") or "").strip()
 
     if fname:
-        return fname
-    if uname:
-        return f"@{uname}"
-    return str(u.get("user_id"))
+        name = fname
+    elif uname:
+        name = f"@{uname}"
+    else:
+        name = str(u.get("user_id"))
+    return name if len(name) <= 35 else name[:34].rstrip() + "…"
 
 
 # ============================================================
@@ -168,7 +171,9 @@ def _clean_actions(actions: list[str] | None) -> list[str]:
         # якщо після всього є хоч щось — додаємо
         a = a.strip()
         if a:
-            result.append(a)
+            if len(a) > 300:
+                a = a[:297].rstrip() + "…"
+            result.append(html.escape(a))
 
     return result
 
@@ -179,12 +184,12 @@ def _clean_actions(actions: list[str] | None) -> list[str]:
 def _build_user_card_text(u: dict) -> str:
     uid = u["user_id"]
     uname = u["username"]
-    fname = u["full_name"] or "—"
+    fname = html.escape(u["full_name"] or "—")
     energy = u["energy"]
     last = _format_last_active(u["last_active_at"])
 
     if uname:
-        profile_link = f'<a href="tg://user?id={uid}">@{uname}</a>'
+        profile_link = f'<a href="tg://user?id={uid}">{html.escape("@" + uname)}</a>'
     else:
         profile_link = f'<a href="tg://user?id={uid}">{fname}</a>'
 

@@ -1,6 +1,7 @@
 
 from datetime import datetime, timedelta
 from math import ceil
+import html
 
 import config
 from aiogram import Router, F, types
@@ -83,8 +84,8 @@ async def _render_users_page(page: int) -> tuple[str, InlineKeyboardMarkup | Non
 
     for idx, u in enumerate(users, start=offset + 1):
         uid = u["user_id"]
-        uname = f"@{u['username']}" if u["username"] else "—"
-        fname = u["full_name"] or "—"
+        uname = html.escape(f"@{u['username']}" if u["username"] else "—")
+        fname = html.escape(u["full_name"] or "—")
         energy = u["energy"]
         last_active = _format_last_active(u["last_active_at"])
         actions = u["actions"] or []
@@ -93,7 +94,10 @@ async def _render_users_page(page: int) -> tuple[str, InlineKeyboardMarkup | Non
         for a in actions:
             a = a.replace("Натиснув / написав: ", "", 1)
             a = a.replace("Inline-кнопка: ", "", 1)
-            clean_actions.append(a)
+            a = a.strip()
+            if len(a) > 80:
+                a = a[:77].rstrip() + "…"
+            clean_actions.append(html.escape(a))
 
         actions_lines = "\n".join(f"🔹 {a}" for a in clean_actions) if clean_actions else "🔸 (немає дій)"
 

@@ -5,6 +5,8 @@ import tempfile
 import asyncio
 from PIL import Image, ImageDraw, ImageFilter
 from modules.energy_panel import build_no_energy_kb
+from modules.telegram_text import answer_long_text, clean_generated_text
+from modules.spread_extension import offer_spread_extension
 from aiogram import Router, F, types
 from aiogram.types import FSInputFile, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
@@ -42,14 +44,15 @@ async def charge_energy_for_spread(user_id: int, cost: int):
 # ======================
 SYSTEM_PROMPT = """
 Ти – досвідчений таролог-наставник.
-Говори глибоко, тепло, інтуїтивно.
-Уникай мотлоху, пиши сильні, красиві смисли.
+Говори тепло, інтуїтивно, але без води й повторів.
+Пиши лаконічно, структуровано та естетично. Відділяй блоки одним порожнім рядком.
+Додавай лише доречні емодзі. Не використовуй Markdown, HTML, зірочки чи решітки.
 Дай відповідь українською або російською, як звертаються.
 Структура:
-1) 🔮 Підсумок
-2) ✨ Короткий розбір карт
-3) 🌙 Висновок
-4) 💛 Мантра
+🔮 Підсумок: 1–2 речення по суті.
+🃏 Карти: кожна позиція окремо, по 1–2 короткі речення.
+🌙 Висновок: 1–2 речення без фаталізму.
+💛 Порада: один конкретний крок або коротка фраза-підтримка.
 """
 
 
@@ -264,7 +267,7 @@ async def interpret_cards_gpt(
         temperature=0.9,
     )
 
-    return resp.choices[0].message.content
+    return clean_generated_text(resp.choices[0].message.content)
 
 
 # ======================
@@ -596,13 +599,21 @@ async def tarot_dialog_cards(message: types.Message, state: FSMContext):
             pass
 
     # Фінальна відповідь
-    await message.answer(
+    await answer_long_text(
+        message,
         f"<b>❓ Питання:</b> {question}\n\n"
         f"<b>🔮 Розклад:</b> {layout['name']}\n"
         f"{chr(10).join(cards_display)}\n\n"
         f"{text}",
         parse_mode="HTML",
         reply_markup=popular_menu,
+    )
+    await offer_spread_extension(
+        message,
+        question=question,
+        spread_name=layout["name"],
+        original_interpretation=text,
+        excluded_cards=[card.get("name") for card in chosen],
     )
 
     await state.clear()

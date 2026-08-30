@@ -24,6 +24,7 @@ from modules.activity_logger import ActivityLoggerMiddleware
 from modules.energy_panel import energy_router
 from modules.start_handler import start_router
 from modules.admin_users import admin_users_router
+from modules.spread_extension import spread_extension_router
 
 # ====================== НАЛАШТУВАННЯ ======================
 WEBHOOK_PATH = "/webhook"
@@ -74,6 +75,7 @@ async def main():
     dp.include_router(start_router)
     dp.include_router(admin_users_router)
     dp.include_router(card_router)
+    dp.include_router(spread_extension_router)
     # dp.include_router(you_other)
     print("✅ Усі роутери підключені")
 
